@@ -199,5 +199,5 @@ def health_check():
 
 if __name__ == '__main__':
     print("飞书机器人服务启动中...")
-    print(f"监听地址: http://0.0.0.0:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print(f"监听地址: http://0.0.0.0:5001")
+    app.run(host='0.0.0.0', port=5001, debug=True)
