@@ -43,7 +43,8 @@ def generate_product_video(
 
     视频要求：
     - 时长：{duration}秒
-    - 尺寸：{spec['width']}x{spec['height']}
+    - 分辨率：{spec['resolution']}
+    - 比例：{spec['aspect_ratio']}
     - 风格：专业、吸引人、适合{platform.upper()}平台
     - 内容：展示产品特点、使用场景、功能优势
     {f"- 突出特性：{features}" if features else ""}
