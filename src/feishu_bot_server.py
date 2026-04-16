@@ -153,27 +153,31 @@ def handle_events():
 
         body = request.get_data(as_text=True)
         print(f"收到事件: {body}")
+        print(f"Headers - Timestamp: {timestamp}")
+        print(f"Headers - Nonce: {nonce}")
+        print(f"Headers - Signature: {signature}")
 
-        # 2. 验证签名
+        # 2. 如果是URL验证请求，直接返回challenge（飞书新版本不需要签名验证）
+        data = json.loads(body)
+        challenge = data.get("challenge", "")
+        event_type = data.get("type", "")
+
+        if event_type == "url_verification":
+            print("收到URL验证请求，直接返回challenge")
+            print(f"Challenge: {challenge}")
+            return jsonify({"challenge": challenge})
+
+        # 3. 验证签名（事件推送时需要）
         if not verify_signature(timestamp, nonce, body, signature):
             print("签名验证失败")
             return jsonify({"code": 1, "msg": "签名验证失败"}), 401
 
-        # 3. 解析JSON数据
-        data = json.loads(body)
-        challenge = data.get("challenge", "")
-
-        # 4. 如果是URL验证请求，直接返回challenge
-        if "url_verification" in data.get("type", ""):
-            print("收到URL验证请求")
-            return jsonify({"challenge": challenge})
-
-        # 5. 如果是事件推送，处理事件
+        # 4. 如果是事件推送，处理事件
         if "event" in data:
             event = data.get("event", {})
             event_type = event.get("type", "")
 
-            # 6. 获取事件ID，防止重复处理
+            # 5. 获取事件ID，防止重复处理
             event_id = data.get("uuid", "")
             if event_id in processed_event_ids:
                 print(f"事件已处理过，跳过: {event_id}")
@@ -182,7 +186,7 @@ def handle_events():
             processed_event_ids.add(event_id)
             print(f"新事件: {event_type}, 事件ID: {event_id}")
 
-            # 7. 处理消息接收事件
+            # 6. 处理消息接收事件
             if event_type == "im.message.receive_v1":
                 print("收到消息事件")
                 process_message(event)
