@@ -181,10 +181,26 @@ def process_message(event_data: dict):
             "Content-Type": "application/json; charset=utf-8"
         }
 
+        # 使用卡片消息格式（更美观）
+        card_content = {
+            "config": {
+                "wide_screen_mode": True
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "content": f"**AI 助手回复**\n\n{reply_content}",
+                        "tag": "lark_md"
+                    }
+                }
+            ]
+        }
+
         data = {
             "receive_id": receiver_id,
-            "msg_type": "text",
-            "content": json.dumps({"text": reply_content})
+            "msg_type": "interactive",
+            "content": json.dumps(card_content)
         }
 
         response = requests.post(url, headers=headers, json=data)
