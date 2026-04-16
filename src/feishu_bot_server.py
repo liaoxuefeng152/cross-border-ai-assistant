@@ -56,15 +56,26 @@ def decrypt_event(encrypted_data: str) -> Optional[str]:
             print("encrypt_key 未配置，无法解密")
             return None
 
-        # 将 key 补全到 32 位（AES-256）
-        key = encrypt_key.encode('utf-8')
-        key = key + (b'\0' * (32 - len(key)))[:32 - len(key)]
+        # 飞书加密算法：AES-128-CBC
+        # Key 和 IV 都使用 encrypt_key
+        key_bytes = encrypt_key.encode('utf-8')
+
+        # Key: 前16字节
+        key = key_bytes[:16]
+
+        # IV: 后16字节（如果不够则重复使用）
+        iv = key_bytes[16:32]
+        if len(iv) < 16:
+            iv = key_bytes + (key_bytes * ((16 - len(iv)) // len(key_bytes) + 1))[:16]
+        iv = iv[:16]
+
+        print(f"解密参数 - Key length: {len(key)}, IV length: {len(iv)}")
 
         # Base64 解码
         encrypted_bytes = base64.b64decode(encrypted_data)
 
-        # AES 解密（ECB 模式）
-        cipher = AES.new(key, AES.MODE_ECB)
+        # AES 解密（CBC 模式）
+        cipher = AES.new(key, AES.MODE_CBC, iv)
         decrypted_bytes = cipher.decrypt(encrypted_bytes)
 
         # 去除 padding
@@ -209,7 +220,8 @@ def handle_events():
         data = json.loads(body)
 
         # 检查是否加密
-        if "encrypt" in data:
+        encrypt_key = FEISHU_CONFIG.get("encrypt_key", "")
+        if "encrypt" in data and encrypt_key:
             print("检测到加密事件，正在解密...")
             decrypted_body = decrypt_event(data["encrypt"])
             if not decrypted_body:
@@ -218,6 +230,9 @@ def handle_events():
             data = json.loads(decrypted_body)
             body = decrypted_body
             print(f"解密后事件: {json.dumps(data, ensure_ascii=False)}")
+        elif "encrypt" in data and not encrypt_key:
+            print("警告: 收到加密事件但未配置encrypt_key，请在飞书开放平台关闭事件加密或配置正确的密钥")
+            return jsonify({"code": 1, "msg": "未配置加密密钥"}), 500
 
         # 3. 如果是URL验证请求，直接返回challenge（飞书新版本不需要签名验证）
         challenge = data.get("challenge", "")
