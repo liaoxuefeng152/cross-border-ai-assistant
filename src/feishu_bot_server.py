@@ -130,19 +130,22 @@ def process_message(event_data: dict):
         # 2. 获取接收者信息
         sender = event_data.get("sender", {})
         open_id = sender.get("sender_id", {}).get("open_id", "")
-        chat_id = event_data.get("chat_id", "")
 
-        # 3. 判断消息类型（群组消息还是个人消息）
-        chat_type = event_data.get("chat_type", "")
+        # 3. 从 message 对象中获取 chat_id 和 chat_type
+        message = event_data.get("message", {})
+        chat_id = message.get("chat_id", "")
+        chat_type = message.get("chat_type", "")
+
+        # 4. 判断消息类型（群组消息还是个人消息）
         is_group_message = (chat_type == "group")
 
-        # 4. 生成唯一的thread_id（用于会话记忆）
+        # 5. 生成唯一的thread_id（用于会话记忆）
         if is_group_message:
             thread_id = chat_id
         else:
             thread_id = open_id
 
-        print(f"消息类型: {'群组' if is_group_message else '个人'}, thread_id: {thread_id}")
+        print(f"消息类型: {'群组' if is_group_message else '个人'}, chat_id: {chat_id}, thread_id: {thread_id}")
 
         # 5. 构建Agent并调用
         agent = build_agent()
@@ -173,6 +176,8 @@ def process_message(event_data: dict):
 
         token = get_tenant_access_token()
         receiver_type = "chat_id" if is_group_message else "open_id"
+
+        print(f"准备发送回复 - receiver_type: {receiver_type}, receiver_id: {receiver_id}")
 
         url = f"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type={receiver_type}"
 
