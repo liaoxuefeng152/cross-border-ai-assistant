@@ -48,6 +48,10 @@ from tools.feishu_message_tool import (
     send_feishu_card,
     test_feishu_connection
 )
+from tools.product_publish_tool import (
+    publish_product_to_platform,
+    generate_product_publish_template
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -121,6 +125,10 @@ def build_agent(ctx=None):
         send_feishu_message,
         send_feishu_card,
         test_feishu_connection,
+
+        # 商品发布工具
+        publish_product_to_platform,
+        generate_product_publish_template,
     ]
 
     return create_agent(
