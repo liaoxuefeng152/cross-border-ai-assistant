@@ -2,8 +2,8 @@
 FEISHU_CONFIG = {
     "app_id": "cli_a96a4c1a8761dcca",
     "app_secret": "t8kleP5zldtVMbtLGfdtlbL33HkcfSmO",
-    "verification_token": "O27ycYJ7tKlS6rGcbwo0OdYdxtQHi6La",
-    "encrypt_key": "",  # 留空表示不使用加密
+    "verification_token": "",  # 已清空
+    "encrypt_key": "",  # 已清空
     "enable_signature_verification": False,  # 暂时禁用签名验证
 }
 
