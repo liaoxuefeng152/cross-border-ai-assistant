@@ -81,6 +81,7 @@ psycopg-pool==3.3.0
 psycopg2-binary==2.9.11
 pycairo==1.29.0
 pycparser==3.0
+pycryptodome==3.23.0
 pydantic==2.12.5
 pydantic-core==2.41.5
 pygments==2.19.2

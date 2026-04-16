@@ -9,6 +9,8 @@ from typing import Optional
 from config.feishu_config import FEISHU_CONFIG
 from agents.agent import build_agent
 from langchain_core.messages import HumanMessage, AIMessage
+import Crypto.Cipher.AES as AES
+import Crypto.Util.Padding as Padding
 
 app = Flask(__name__)
 
@@ -44,6 +46,40 @@ def verify_signature(timestamp: str, nonce: str, body: str, signature: str) -> b
     print(f"===================")
 
     return hex_digest == signature
+
+
+def decrypt_event(encrypted_data: str) -> Optional[str]:
+    """解密飞书加密事件"""
+    try:
+        encrypt_key = FEISHU_CONFIG.get("encrypt_key", "")
+        if not encrypt_key:
+            print("encrypt_key 未配置，无法解密")
+            return None
+
+        # 将 key 补全到 32 位（AES-256）
+        key = encrypt_key.encode('utf-8')
+        key = key + (b'\0' * (32 - len(key)))[:32 - len(key)]
+
+        # Base64 解码
+        encrypted_bytes = base64.b64decode(encrypted_data)
+
+        # AES 解密（ECB 模式）
+        cipher = AES.new(key, AES.MODE_ECB)
+        decrypted_bytes = cipher.decrypt(encrypted_bytes)
+
+        # 去除 padding
+        decrypted_bytes = Padding.unpad(decrypted_bytes, AES.block_size)
+
+        # 转换为字符串
+        decrypted_str = decrypted_bytes.decode('utf-8')
+        print(f"解密成功: {decrypted_str[:200]}...")
+        return decrypted_str
+
+    except Exception as e:
+        print(f"解密失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 def get_user_content(event_data: dict) -> Optional[str]:
@@ -169,8 +205,21 @@ def handle_events():
         print(f"Headers - Nonce: {nonce}")
         print(f"Headers - Signature: {signature}")
 
-        # 2. 如果是URL验证请求，直接返回challenge（飞书新版本不需要签名验证）
+        # 2. 解析JSON数据并检查是否加密
         data = json.loads(body)
+
+        # 检查是否加密
+        if "encrypt" in data:
+            print("检测到加密事件，正在解密...")
+            decrypted_body = decrypt_event(data["encrypt"])
+            if not decrypted_body:
+                return jsonify({"code": 1, "msg": "解密失败"}), 500
+            # 解密后的内容替换原始 data
+            data = json.loads(decrypted_body)
+            body = decrypted_body
+            print(f"解密后事件: {json.dumps(data, ensure_ascii=False)}")
+
+        # 3. 如果是URL验证请求，直接返回challenge（飞书新版本不需要签名验证）
         challenge = data.get("challenge", "")
         event_type = data.get("type", "")
 
