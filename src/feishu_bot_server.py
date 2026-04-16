@@ -3,6 +3,7 @@ import json
 import hmac
 import hashlib
 import base64
+import requests
 from flask import Flask, request, jsonify
 from typing import Optional
 from config.feishu_config import FEISHU_CONFIG
@@ -16,14 +17,20 @@ processed_event_ids = set()
 
 
 def verify_signature(timestamp: str, nonce: str, body: str, signature: str) -> bool:
-    """验证请求签名"""
-    token = FEISHU_CONFIG["verification_token"]
-    sign_str = f"{timestamp}{nonce}{token}"
+    """验证请求签名（使用app_secret）"""
+    app_secret = FEISHU_CONFIG["app_secret"]
+    sign_str = f"{timestamp}{nonce}{body}"
     sign_bytes = sign_str.encode('utf-8')
-    sha256 = hashlib.sha256()
-    sha256.update(sign_bytes)
-    digest = sha256.digest()
+
+    # 使用HMAC-SHA256算法生成签名
+    hmac_obj = hmac.new(
+        app_secret.encode('utf-8'),
+        sign_bytes,
+        hashlib.sha256
+    )
+    digest = hmac_obj.digest()
     b64_digest = base64.b64encode(digest).decode('utf-8')
+
     return b64_digest == signature
 
 
