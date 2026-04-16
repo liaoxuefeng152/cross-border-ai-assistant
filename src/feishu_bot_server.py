@@ -17,29 +17,33 @@ processed_event_ids = set()
 
 
 def verify_signature(timestamp: str, nonce: str, body: str, signature: str) -> bool:
-    """验证请求签名（使用app_secret）"""
-    app_secret = FEISHU_CONFIG["app_secret"]
+    """验证请求签名（使用encrypt_key）"""
+    encrypt_key = FEISHU_CONFIG.get("encrypt_key", "")
+    if not encrypt_key:
+        print("encrypt_key 未配置，跳过签名验证")
+        return True
+
+    # 使用 encrypt_key 进行 HMAC-SHA256 签名
     sign_str = f"{timestamp}{nonce}{body}"
     sign_bytes = sign_str.encode('utf-8')
 
-    # 使用HMAC-SHA256算法生成签名
     hmac_obj = hmac.new(
-        app_secret.encode('utf-8'),
+        encrypt_key.encode('utf-8'),
         sign_bytes,
         hashlib.sha256
     )
     digest = hmac_obj.digest()
-    b64_digest = base64.b64encode(digest).decode('utf-8')
+    # 飞书的签名是 hex 格式，不是 base64
+    hex_digest = hmac_obj.hexdigest()
 
-    # 调试日志
     print(f"=== 签名验证调试 ===")
-    print(f"sign_str: {sign_str}")
-    print(f"expected signature: {b64_digest}")
+    print(f"sign_str[:100]: {sign_str[:100]}...")
+    print(f"expected signature: {hex_digest}")
     print(f"received signature: {signature}")
-    print(f"match: {b64_digest == signature}")
+    print(f"match: {hex_digest == signature}")
     print(f"===================")
 
-    return b64_digest == signature
+    return hex_digest == signature
 
 
 def get_user_content(event_data: dict) -> Optional[str]:
@@ -176,11 +180,12 @@ def handle_events():
             return jsonify({"challenge": challenge})
 
         # 3. 验证签名（事件推送时需要）
-        # 注意：暂时禁用签名验证，用于调试
-        # if not verify_signature(timestamp, nonce, body, signature):
-        #     print("签名验证失败")
-        #     return jsonify({"code": 1, "msg": "签名验证失败"}), 401
-        print(f"跳过签名验证（调试模式）")
+        if FEISHU_CONFIG.get("enable_signature_verification", False):
+            if not verify_signature(timestamp, nonce, body, signature):
+                print("签名验证失败")
+                return jsonify({"code": 1, "msg": "签名验证失败"}), 401
+        else:
+            print("签名验证已禁用（调试模式）")
 
         # 4. 如果是事件推送，处理事件
         if "event" in data:
