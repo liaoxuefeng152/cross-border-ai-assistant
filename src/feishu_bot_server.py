@@ -1,5 +1,8 @@
 """飞书机器人事件接收服务"""
 import json
+import hmac
+import hashlib
+import base64
 import requests
 from flask import Flask, request, jsonify
 from typing import Optional
@@ -11,6 +14,32 @@ app = Flask(__name__)
 
 # 存储已处理的事件ID，防止重复处理
 processed_event_ids = set()
+
+
+def verify_signature(timestamp: str, nonce: str, body: str, signature: str) -> bool:
+    """验证请求签名（使用app_secret）"""
+    app_secret = FEISHU_CONFIG["app_secret"]
+    sign_str = f"{timestamp}{nonce}{body}"
+    sign_bytes = sign_str.encode('utf-8')
+
+    # 使用HMAC-SHA256算法生成签名
+    hmac_obj = hmac.new(
+        app_secret.encode('utf-8'),
+        sign_bytes,
+        hashlib.sha256
+    )
+    digest = hmac_obj.digest()
+    b64_digest = base64.b64encode(digest).decode('utf-8')
+
+    # 调试日志
+    print(f"=== 签名验证调试 ===")
+    print(f"sign_str: {sign_str}")
+    print(f"expected signature: {b64_digest}")
+    print(f"received signature: {signature}")
+    print(f"match: {b64_digest == signature}")
+    print(f"===================")
+
+    return b64_digest == signature
 
 
 def get_user_content(event_data: dict) -> Optional[str]:
@@ -125,24 +154,33 @@ def process_message(event_data: dict):
 def handle_events():
     """处理飞书事件"""
     try:
-        # 1. 获取请求参数（仅用于日志记录）
+        # 1. 获取请求参数
         timestamp = request.headers.get('X-Lark-Request-Timestamp', '')
         nonce = request.headers.get('X-Lark-Request-Nonce', '')
         signature = request.headers.get('X-Lark-Signature', '')
 
         body = request.get_data(as_text=True)
         print(f"收到事件: {body}")
+        print(f"Headers - Timestamp: {timestamp}")
+        print(f"Headers - Nonce: {nonce}")
+        print(f"Headers - Signature: {signature}")
 
-        # 2. 解析JSON数据
+        # 2. 如果是URL验证请求，直接返回challenge（飞书新版本不需要签名验证）
         data = json.loads(body)
         challenge = data.get("challenge", "")
         event_type = data.get("type", "")
 
-        # 3. 如果是URL验证请求，直接返回challenge
         if event_type == "url_verification":
             print("收到URL验证请求，直接返回challenge")
             print(f"Challenge: {challenge}")
             return jsonify({"challenge": challenge})
+
+        # 3. 验证签名（事件推送时需要）
+        # 注意：暂时禁用签名验证，用于调试
+        # if not verify_signature(timestamp, nonce, body, signature):
+        #     print("签名验证失败")
+        #     return jsonify({"code": 1, "msg": "签名验证失败"}), 401
+        print(f"跳过签名验证（调试模式）")
 
         # 4. 如果是事件推送，处理事件
         if "event" in data:
