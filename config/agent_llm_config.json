@@ -21,6 +21,10 @@
     "generate_product_video",
     "generate_product_intro_video",
     "upload_file_to_storage",
-    "generate_presigned_url"
+    "generate_presigned_url",
+    "get_tiktok_shop_products",
+    "get_tiktok_shop_orders",
+    "get_tiktok_shop_order_detail",
+    "get_tiktok_shop_analytics"
   ]
 }

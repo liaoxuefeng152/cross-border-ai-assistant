@@ -37,6 +37,12 @@ from tools.storage_tool import (
     upload_file_to_storage,
     generate_presigned_url
 )
+from tools.tiktok_shop_api_tool import (
+    get_tiktok_shop_products,
+    get_tiktok_shop_orders,
+    get_tiktok_shop_order_detail,
+    get_tiktok_shop_analytics
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -99,6 +105,12 @@ def build_agent(ctx=None):
         # 存储工具
         upload_file_to_storage,
         generate_presigned_url,
+
+        # TikTok Shop API工具
+        get_tiktok_shop_products,
+        get_tiktok_shop_orders,
+        get_tiktok_shop_order_detail,
+        get_tiktok_shop_analytics,
     ]
 
     return create_agent(
