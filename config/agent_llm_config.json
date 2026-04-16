@@ -25,6 +25,9 @@
     "get_tiktok_shop_products",
     "get_tiktok_shop_orders",
     "get_tiktok_shop_order_detail",
-    "get_tiktok_shop_analytics"
+    "get_tiktok_shop_analytics",
+    "send_feishu_message",
+    "send_feishu_card",
+    "test_feishu_connection"
   ]
 }

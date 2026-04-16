@@ -43,6 +43,11 @@ from tools.tiktok_shop_api_tool import (
     get_tiktok_shop_order_detail,
     get_tiktok_shop_analytics
 )
+from tools.feishu_message_tool import (
+    send_feishu_message,
+    send_feishu_card,
+    test_feishu_connection
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -111,6 +116,11 @@ def build_agent(ctx=None):
         get_tiktok_shop_orders,
         get_tiktok_shop_order_detail,
         get_tiktok_shop_analytics,
+
+        # 飞书消息工具
+        send_feishu_message,
+        send_feishu_card,
+        test_feishu_connection,
     ]
 
     return create_agent(

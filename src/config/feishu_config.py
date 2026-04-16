@@ -1,0 +1,10 @@
+"""飞书机器人配置"""
+FEISHU_CONFIG = {
+    "app_id": "cli_a96a4c1a8761dcca",
+    "app_secret": "t8kleP5zldtVMbtLGfdtlbL33HkcfSmO",
+    "verification_token": "O27ycYJ7tKlS6rGcbwo0OdYdxtQHi6La",
+    "encrypt_key": "",  # 可选，如果未启用加密则留空
+}
+
+# 飞书API基础URL
+FEISHU_API_BASE_URL = "https://open.feishu.cn/open-apis"
