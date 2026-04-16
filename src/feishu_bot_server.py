@@ -31,6 +31,14 @@ def verify_signature(timestamp: str, nonce: str, body: str, signature: str) -> b
     digest = hmac_obj.digest()
     b64_digest = base64.b64encode(digest).decode('utf-8')
 
+    # 调试日志
+    print(f"=== 签名验证调试 ===")
+    print(f"sign_str: {sign_str}")
+    print(f"expected signature: {b64_digest}")
+    print(f"received signature: {signature}")
+    print(f"match: {b64_digest == signature}")
+    print(f"===================")
+
     return b64_digest == signature
 
 
