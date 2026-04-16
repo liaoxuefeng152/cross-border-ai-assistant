@@ -40,11 +40,11 @@ def generate_product_image(
     result = client.generate(
         prompt=prompt.strip(),
         size=size,
-        quality="high"
+        watermark=False
     )
 
-    if result and hasattr(result, 'url'):
-        return f"✅ 商品图片生成成功！\n\n**图片链接**: {result.url}\n\n可以直接用于Shopee、Lazada、TikTok Shop等平台商品主图。"
+    if result and result.success:
+        return f"✅ 商品图片生成成功！\n\n**图片链接**: {result.image_urls[0]}\n\n可以直接用于Shopee、Lazada、TikTok Shop等平台商品主图。"
     else:
         return "❌ 图片生成失败，请稍后重试"
 
@@ -90,11 +90,11 @@ def generate_product_lifestyle_image(
     result = client.generate(
         prompt=prompt.strip(),
         size=size,
-        quality="high"
+        watermark=False
     )
 
-    if result and hasattr(result, 'url'):
-        return f"✅ 生活场景图生成成功！\n\n**图片链接**: {result.url}\n\n适合用作商品详情页或轮播图。"
+    if result and result.success:
+        return f"✅ 生活场景图生成成功！\n\n**图片链接**: {result.image_urls[0]}\n\n适合用作商品详情页或轮播图。"
     else:
         return "❌ 图片生成失败，请稍后重试"
 
@@ -138,10 +138,10 @@ def generate_product_infographic(
     result = client.generate(
         prompt=prompt.strip(),
         size=size,
-        quality="high"
+        watermark=False
     )
 
-    if result and hasattr(result, 'url'):
-        return f"✅ 商品信息图生成成功！\n\n**图片链接**: {result.url}\n\n适合用作商品详情页特性展示或营销海报。"
+    if result and result.success:
+        return f"✅ 商品信息图生成成功！\n\n**图片链接**: {result.image_urls[0]}\n\n适合用作商品详情页特性展示或营销海报。"
     else:
         return "❌ 图片生成失败，请稍后重试"
