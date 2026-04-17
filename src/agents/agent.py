@@ -52,6 +52,11 @@ from tools.product_publish_tool import (
     publish_product_to_platform,
     generate_product_publish_template
 )
+from tools.product_scrape_tool import (
+    scrape_product_from_url,
+    batch_scrape_products,
+    get_supported_platforms
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -129,6 +134,11 @@ def build_agent(ctx=None):
         # 商品发布工具
         publish_product_to_platform,
         generate_product_publish_template,
+
+        # 商品采集工具
+        scrape_product_from_url,
+        batch_scrape_products,
+        get_supported_platforms,
     ]
 
     return create_agent(
