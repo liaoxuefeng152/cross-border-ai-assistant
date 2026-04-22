@@ -686,19 +686,22 @@
             } catch (error) {
                 console.error('发送失败:', error);
 
-                // 检查后端是否连接
-                addMessage('assistant', `⚠️ 无法连接到后端服务\n\n错误信息：${error.message}\n\n请确保：\n1. 后端服务已启动（在 http://localhost:8000）\n2. 已经按照指南实现完整的后端API\n\n或者直接在这里测试对话功能，我可以模拟回复。`);
+                // 显示演示模式提示
+                const demoMessage = `⚠️ **演示模式**\n\n由于后端服务未启动，当前使用模拟回复功能。\n\n错误信息：${error.message}\n\n---\n\n要使用真实AI功能，请：\n1. 按照《龙掌柜智能运营助手后端实现指南》实现后端API\n2. 启动后端服务在 http://localhost:8000\n3. 修改网页中的 API_BASE_URL\n\n---\n\n以下是我的模拟回复：`;
+
+                addMessage('assistant', demoMessage, []);
 
                 // 模拟回复（用于演示）
                 setTimeout(() => {
                     const mockResponses = [
                         '好的！让我帮你分析一下...\n\n基于我的分析，以下是几个建议：\n\n1. 🎯 **产品选择**：建议关注3C电子类目，市场需求大\n2. 📊 **市场分析**：当前趋势显示智能穿戴设备增长迅速\n3. 💡 **运营建议**：优化Listing标题，包含更多关键词\n\n需要我详细说明吗？',
                         '收到！让我来处理...\n\n根据你的需求，我已经完成了以下工作：\n\n✅ 分析市场趋势\n✅ 识别竞争产品\n✅ 提供优化建议\n\n下一步你想了解什么？',
-                        '没问题！让我帮你...\n\n以下是我的分析结果：\n\n**市场数据**：\n- 需求量：📈 持续增长\n- 竞争程度：⚡ 中等\n- 利润空间：💰 良好\n\n**建议**：\n1. 优化产品描述\n2. 提升图片质量\n3. 合理定价策略\n\n需要更详细的建议吗？'
+                        '没问题！让我帮你...\n\n以下是我的分析结果：\n\n**市场数据**：\n- 需求量：📈 持续增长\n- 竞争程度：⚡ 中等\n- 利润空间：💰 良好\n\n**建议**：\n1. 优化产品描述\n2. 提升图片质量\n3. 合理定价策略\n\n需要更详细的建议吗？',
+                        '我明白了！让我为您提供专业建议...\n\n**选品分析**：\n- 市场趋势：3C类目持续增长\n- 竞品情况：竞争适中，有机会\n- 利润空间：平均30%-50%\n\n**运营建议**：\n1. 优化Listing SEO\n2. 提升主图质量\n3. 合理设置价格\n\n您想了解哪个方面的详细信息？'
                     ];
                     const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-                    addMessage('assistant', randomResponse, ['市场分析', '竞品分析']);
-                }, 1000);
+                    addMessage('assistant', randomResponse, ['市场分析', '竞品分析', '模拟回复']);
+                }, 1500);
             } finally {
                 // 隐藏加载动画
                 showTypingIndicator(false);
