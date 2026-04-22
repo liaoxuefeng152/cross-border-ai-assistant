@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>龙掌柜智能运营助手 - 商品采集工具</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .header-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .platform-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 5px;
+            display: inline-block;
+        }
+        .input-group-text {
+            background: white;
+            border: 2px solid #667eea;
+        }
+        .form-control {
+            border: 2px solid #667eea;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .form-control:focus {
+            box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+        }
+        .btn-scrape {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 15px 40px;
+            font-weight: 600;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .btn-scrape:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .result-card {
+            display: none;
+            margin-top: 30px;
+        }
+        .product-image {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .product-image:hover {
+            transform: scale(1.05);
+        }
+        .info-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .platform-icon {
+            font-size: 1.2em;
+            margin-right: 5px;
+        }
+        .loading-spinner {
+            display: none;
+            margin: 20px 0;
+        }
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .gallery-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .gallery-image:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            position: relative;
+        }
+        .price-tag {
+            font-size: 2em;
+            color: #e74c3c;
+            font-weight: 700;
+        }
+        .attribute-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 5px 0;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .pre-wrapper {
+            position: relative;
+        }
+        .pre-wrapper:hover .copy-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <!-- 头部卡片 -->
+        <div class="card header-card">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-3"><i class="bi bi-shop"></i> 龙掌柜智能运营助手</h1>
+                    <h4 class="mb-3">商品智能采集工具</h4>
+                    <p class="mb-0">支持1688、淘宝、天猫、京东、拼多多等主流电商平台商品信息采集</p>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div class="mt-3">
+                        <span class="platform-badge"><i class="bi bi-cart"></i> 1688</span>
+                        <span class="platform-badge"><i class="bi bi-bag"></i> 淘宝</span>
+                        <span class="platform-badge"><i class="bi bi-tag"></i> 天猫</span>
+                        <span class="platform-badge"><i class="bi bi-box"></i> 京东</span>
+                        <span class="platform-badge"><i class="bi bi-percent"></i> 拼多多</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3"><i class="bi bi-link-45deg"></i> 输入商品链接</h5>
+                <div class="input-group mb-3">
+                    <span class="input-group-text">
+                        <i class="bi bi-link"></i>
+                    </span>
+                    <input type="text"
+                           class="form-control"
+                           id="productUrl"
+                           placeholder="请输入商品链接，例如：https://detail.1688.com/offer/123456789.html"
+                           onkeypress="handleKeyPress(event)">
+                    <button class="btn btn-scrape text-white" onclick="scrapeProduct()">
+                        <i class="bi bi-download"></i> 立即采集
+                    </button>
+                </div>
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle"></i> 支持的平台：1688、淘宝、天猫、京东、拼多多
+                </div>
+            </div>
+        </div>
+
+        <!-- 加载状态 -->
+        <div class="card loading-spinner" id="loadingSpinner">
+            <div class="card-body text-center p-5">
+                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">正在采集商品信息，请稍候...</p>
+            </div>
+        </div>
+
+        <!-- 错误信息 -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- 成功信息 -->
+        <div class="success-message" id="successMessage"></div>
+
+        <!-- 结果展示 -->
+        <div class="card result-card" id="resultCard">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> 采集成功</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row">
+                    <!-- 左侧：基本信息 -->
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-tag"></i> 商品标题</div>
+                            <div class="info-value" id="productTitle"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-shop"></i> 平台</div>
+                            <div class="info-value">
+                                <span class="badge bg-primary" id="productPlatform"></span>
+                                <small class="text-muted ms-2">ID: <span id="productId"></span></small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-currency-yen"></i> 价格</div>
+                            <div class="price-tag" id="productPrice"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-link"></i> 原始链接</div>
+                            <div class="info-value">
+                                <a id="productLink" href="#" target="_blank" class="text-primary">
+                                    <i class="bi bi-box-arrow-up-right"></i> 点击访问
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-info-circle"></i> 商品属性</div>
+                            <div id="productAttributes"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-box"></i> 库存</div>
+                            <div class="info-value" id="productStock"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-graph-up"></i> 销量</div>
+                            <div class="info-value" id="productSales"></div>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：图片和描述 -->
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-images"></i> 商品图片</div>
+                            <div class="image-gallery" id="imageGallery"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-card-text"></i> 商品描述</div>
+                            <div class="info-value" id="productDescription" style="max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="info-label"><i class="bi bi-code-square"></i> 完整JSON数据</div>
+                            <div class="pre-wrapper">
+                                <button class="copy-btn" onclick="copyJSON()">
+                                    <i class="bi bi-clipboard"></i> 复制
+                                </button>
+                                <pre class="pre-scrollable bg-light p-3 rounded" id="jsonResult" style="max-height: 300px; overflow-y: auto; font-size: 0.85em;"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片查看模态框 -->
+    <div class="modal fade" id="imageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">商品图片</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" class="img-fluid" alt="商品图片">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // API基础URL - 修改为你的后端地址
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+        let currentProductData = null;
+
+        // 处理回车键
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                scrapeProduct();
+            }
+        }
+
+        // 采集商品
+        async function scrapeProduct() {
+            const url = document.getElementById('productUrl').value.trim();
+
+            if (!url) {
+                showError('请输入商品链接');
+                return;
+            }
+
+            // 验证URL格式
+            if (!isValidUrl(url)) {
+                showError('请输入有效的URL格式');
+                return;
+            }
+
+            // 显示加载状态
+            showLoading(true);
+            hideError();
+            hideSuccess();
+            hideResult();
+
+            try {
+                // 调用API
+                const response = await fetch(`${API_BASE_URL}/products/scrape`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        platform: detectPlatform(url)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    currentProductData = data;
+                    displayResult(data);
+                    showSuccess('商品信息采集成功！');
+                } else {
+                    showError(data.error || '采集失败，请检查链接是否正确');
+                }
+
+            } catch (error) {
+                console.error('采集失败:', error);
+                showError('采集失败：' + (error.message || '网络错误，请检查后端服务是否启动'));
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 显示结果
+        function displayResult(data) {
+            document.getElementById('productTitle').textContent = data.title || '未知';
+            document.getElementById('productPlatform').textContent = getPlatformName(data.platform);
+            document.getElementById('productId').textContent = data.product_id || '未知';
+            document.getElementById('productPrice').textContent = formatPrice(data.price, data.currency);
+            document.getElementById('productLink').href = data.source_url || '#';
+            document.getElementById('productStock').textContent = formatNumber(data.stock) || '未知';
+            document.getElementById('productSales').textContent = formatNumber(data.sales) || '未知';
+            document.getElementById('productDescription').textContent = data.description || '暂无描述';
+
+            // 显示属性
+            const attributesDiv = document.getElementById('productAttributes');
+            if (data.attributes && Object.keys(data.attributes).length > 0) {
+                attributesDiv.innerHTML = Object.entries(data.attributes)
+                    .map(([key, value]) => `<div class="attribute-item"><strong>${key}:</strong> ${value}</div>`)
+                    .join('');
+            } else {
+                attributesDiv.innerHTML = '<small class="text-muted">暂无属性信息</small>';
+            }
+
+            // 显示图片
+            const gallery = document.getElementById('imageGallery');
+            if (data.images && data.images.length > 0) {
+                gallery.innerHTML = data.images.map((img, index) =>
+                    `<img src="${img}" class="gallery-image" onclick="showImage('${img}')" alt="商品图片 ${index + 1}">`
+                ).join('');
+            } else {
+                gallery.innerHTML = '<small class="text-muted">暂无图片</small>';
+            }
+
+            // 显示JSON
+            document.getElementById('jsonResult').textContent = JSON.stringify(data, null, 2);
+
+            // 显示结果卡片
+            showResult();
+        }
+
+        // 复制JSON
+        function copyJSON() {
+            const jsonText = document.getElementById('jsonResult').textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                alert('JSON数据已复制到剪贴板！');
+            }).catch(err => {
+                console.error('复制失败:', err);
+            });
+        }
+
+        // 显示图片模态框
+        function showImage(src) {
+            document.getElementById('modalImage').src = src;
+            const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+            modal.show();
+        }
+
+        // 验证URL
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // 检测平台
+        function detectPlatform(url) {
+            if (url.includes('1688.com')) return '1688';
+            if (url.includes('taobao.com')) return 'taobao';
+            if (url.includes('tmall.com')) return 'tmall';
+            if (url.includes('jd.com')) return 'jd';
+            if (url.includes('pinduoduo.com') || url.includes('yangkeduo.com')) return 'pinduoduo';
+            return 'generic';
+        }
+
+        // 获取平台名称
+        function getPlatformName(platform) {
+            const names = {
+                '1688': '阿里巴巴1688',
+                'taobao': '淘宝',
+                'tmall': '天猫',
+                'jd': '京东',
+                'pinduoduo': '拼多多',
+                'generic': '通用'
+            };
+            return names[platform] || '未知';
+        }
+
+        // 格式化价格
+        function formatPrice(price, currency) {
+            const symbols = {
+                'CNY': '¥',
+                'USD': '$',
+                'EUR': '€'
+            };
+            const symbol = symbols[currency] || '';
+            return `${symbol}${parseFloat(price || 0).toFixed(2)}`;
+        }
+
+        // 格式化数字
+        function formatNumber(num) {
+            if (!num) return '0';
+            return num.toLocaleString();
+        }
+
+        // 显示/隐藏各种元素
+        function showLoading(show) {
+            document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${message}`;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.innerHTML = `<i class="bi bi-check-circle"></i> ${message}`;
+            successDiv.style.display = 'block';
+        }
+
+        function hideSuccess() {
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        function showResult() {
+            document.getElementById('resultCard').style.display = 'block';
+        }
+
+        function hideResult() {
+            document.getElementById('resultCard').style.display = 'none';
+        }
+
+        // 示例链接
+        const exampleUrls = [
+            'https://detail.1688.com/offer/123456789.html',
+            'https://item.taobao.com/item.htm?id=987654321',
+            'https://item.jd.com/123456789.html'
+        ];
+
+        // 页面加载完成后，将示例链接填充到输入框
+        window.onload = function() {
+            const randomIndex = Math.floor(Math.random() * exampleUrls.length);
+            document.getElementById('productUrl').placeholder = `例如：${exampleUrls[randomIndex]}`;
+        };
+    </script>
+</body>
+</html>
