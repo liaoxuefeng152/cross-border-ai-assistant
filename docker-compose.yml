@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: longzhang-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - COZE_WORKLOAD_IDENTITY_API_KEY=${COZE_WORKLOAD_IDENTITY_API_KEY}
+      - COZE_INTEGRATION_MODEL_BASE_URL=${COZE_INTEGRATION_MODEL_BASE_URL}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - longzhang-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: longzhang-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - longzhang-network
+
+networks:
+  longzhang-network:
+    driver: bridge
