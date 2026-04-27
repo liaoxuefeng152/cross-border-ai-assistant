@@ -64,7 +64,7 @@ async def chat_message(request: ChatRequest):
                     ],
                     "temperature": 0.7,
                     "max_tokens": 2000,
-                    "stream": False
+                    "stream": True
                 }
             )
 
