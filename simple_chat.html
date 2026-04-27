@@ -299,18 +299,31 @@
             // 显示输入状态
             document.getElementById('typing').classList.add('active');
 
-            // 调用API
+            // 调用API，设置60秒超时
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
+
             fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, session_id: sessionId })
+                body: JSON.stringify({ message, session_id: sessionId }),
+                signal: controller.signal
             })
-            .then(res => res.json())
+            .then(res => {
+                clearTimeout(timeoutId);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.json();
+            })
             .then(data => {
+                if (!data.message) {
+                    throw new Error('返回数据格式错误');
+                }
                 addMessage('bot', data.message);
             })
             .catch(err => {
-                console.log('API调用失败，使用模拟回复');
+                console.error('API调用失败:', err);
                 // 使用模拟回复
                 let reply = mockResponses.default;
                 if (message.includes('选品') || message.includes('产品')) {
