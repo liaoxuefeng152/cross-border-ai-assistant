@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8080",
-        "https://longzhangguai-ai.loca.lt"
+        "https://longzhangguai-ai.loca.lt",
+        "https://longzhang-ai-final.loca.lt",
+        "*"  # 开发环境允许所有来源
     ]
 
     class Config:
