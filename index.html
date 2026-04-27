@@ -376,33 +376,48 @@
             const avatar = role === 'user' ? '👤' : '🤖';
             const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
+            // 创建消息结构
+            msgDiv.innerHTML = `<div class="message-avatar">${avatar}</div><div class="message-content"></div>`;
+            messages.appendChild(msgDiv);
+
+            const contentDiv = msgDiv.querySelector('.message-content');
             let contentHtml = '';
 
-            // 添加图片预览
+            // 添加时间戳
+            contentHtml += `<div class="message-time">${time}</div>`;
+
+            // 添加图片预览（异步）
             if (file && file.type && file.type.startsWith('image/')) {
+                contentHtml += `<div class="message-image"><img src="" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 10px;"></div>`;
+                if (content) {
+                    contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
+                }
+                contentDiv.innerHTML = contentHtml;
+
+                // 异步加载图片
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    contentHtml += `<div class="message-image"><img src="${e.target.result}" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 10px;"></div>`;
-                    if (content) {
-                        contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
+                    const img = contentDiv.querySelector('.message-image img');
+                    if (img) {
+                        img.src = e.target.result;
                     }
-                    contentHtml += `<div class="message-time">${time}</div>`;
-                    msgDiv.querySelector('.message-content').innerHTML = contentHtml;
                 };
                 reader.readAsDataURL(file);
-            } else if (file) {
+            }
+            // 添加文件信息
+            else if (file) {
                 contentHtml += `<div class="message-file">📎 ${file.name}</div>`;
                 if (content) {
                     contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
                 }
-                contentHtml += `<div class="message-time">${time}</div>`;
-            } else {
+                contentDiv.innerHTML = contentHtml;
+            }
+            // 纯文本消息
+            else {
                 contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
-                contentHtml += `<div class="message-time">${time}</div>`;
+                contentDiv.innerHTML = contentHtml;
             }
 
-            msgDiv.innerHTML = `<div class="message-avatar">${avatar}</div><div class="message-content"></div>`;
-            messages.appendChild(msgDiv);
             messages.scrollTop = messages.scrollHeight;
         }
 
