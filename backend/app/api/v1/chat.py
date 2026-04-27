@@ -37,16 +37,34 @@ async def chat_message(request: ChatRequest):
 4. 智能定价：计算保本价，分析利润空间
 5. 竞品分析：分析竞争对手，制定差异化策略
 6. 蓝海挖掘：发现高利润、低竞争的蓝海类目
+7. 图片分析：能够识别和分析用户上传的图片内容
+8. 文件分析：能够阅读和分析用户上传的文本文件内容
 
 # 回复要求：
 - 使用Markdown格式
 - 适当使用表情符号
 - 重要的信息用加粗强调
-- 如果用户问定价相关，提供具体的数字计算
-- 如果用户问选品相关，提供具体的类目推荐
+- 如果用户上传图片，详细描述图片内容并提供相关建议
+- 如果用户上传文件，分析文件内容并提供有价值的建议
 - 回复要简洁明了，不要太长
 
 开始回答用户的问题吧！"""
+
+        # 构建消息列表
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # 如果有图片，添加图片消息（多模态）
+        if hasattr(request, 'image') and request.image:
+            # 豆包多模态模型支持图片URL或base64
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": request.image}},
+                    {"type": "text", "text": request.message or "请帮我分析这张图片"}
+                ]
+            })
+        else:
+            messages.append({"role": "user", "content": request.message})
 
         # 调用豆包API
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -58,10 +76,7 @@ async def chat_message(request: ChatRequest):
                 },
                 json={
                     "model": "doubao-seed-1-8-251228",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": request.message}
-                    ],
+                    "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 2000,
                     "stream": True

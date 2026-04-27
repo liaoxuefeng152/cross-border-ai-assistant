@@ -131,6 +131,21 @@
         }
         .send-btn:hover { transform: scale(1.1); }
         .send-btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .upload-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: transform 0.2s;
+        }
+        .upload-btn:hover { transform: scale(1.1); }
         .typing {
             display: none;
             padding: 10px 15px;
@@ -209,31 +224,122 @@
 
         <div class="input-area">
             <div class="input-wrapper">
+                <input type="file" id="fileInput" style="display: none;" accept="image/*,.txt,.csv,.json,.md" onchange="handleFileUpload(event)">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="上传文件或图片">📎</button>
                 <input type="text" class="input-field" id="input" placeholder="输入你的问题..." onkeypress="if(event.key==='Enter')sendMessage()" oninput="document.getElementById('sendBtn').disabled=this.value.trim()===''">
                 <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>➤</button>
+            </div>
+            <div id="filePreview" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span id="fileIcon">📄</span>
+                    <span id="fileName" style="flex: 1; font-size: 0.9em;"></span>
+                    <button onclick="clearFile()" style="background: none; border: none; cursor: pointer; font-size: 1.2em;">✕</button>
+                </div>
+                <img id="imagePreview" style="max-width: 100%; max-height: 200px; margin-top: 10px; display: none; border-radius: 8px;">
+                <p id="fileContentPreview" style="font-size: 0.8em; color: #666; margin-top: 5px; white-space: pre-wrap; overflow: hidden; max-height: 100px; display: none;"></p>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://rotten-grasshopper-77.loca.lt/api/v1/chat/message';
+        const API_URL = 'https://longzhangbackend-upload.loca.lt/api/v1/chat/message';
         let sessionId = 'session_' + Date.now();
+        let uploadedFile = null;
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            uploadedFile = file;
+            const filePreview = document.getElementById('filePreview');
+            const fileName = document.getElementById('fileName');
+            const fileIcon = document.getElementById('fileIcon');
+            const imagePreview = document.getElementById('imagePreview');
+            const fileContentPreview = document.getElementById('fileContentPreview');
+
+            fileName.textContent = file.name;
+            filePreview.style.display = 'block';
+
+            // 检查是否是图片
+            if (file.type.startsWith('image/')) {
+                fileIcon.textContent = '🖼️';
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    fileContentPreview.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                fileIcon.textContent = '📄';
+                imagePreview.style.display = 'none';
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    fileContentPreview.textContent = e.target.result;
+                    fileContentPreview.style.display = 'block';
+                };
+                reader.readAsText(file);
+            }
+
+            document.getElementById('sendBtn').disabled = false;
+        }
+
+        function clearFile() {
+            uploadedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('filePreview').style.display = 'none';
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('fileContentPreview').style.display = 'none';
+            document.getElementById('sendBtn').disabled = document.getElementById('input').value.trim() === '';
+        }
 
         function sendMessage(text) {
             const input = document.getElementById('input');
             const message = text || input.value.trim();
-            if (!message) return;
+            if (!message && !uploadedFile) return;
 
             document.getElementById('welcome').style.display = 'none';
-            addMessage('user', message);
+            addMessage('user', message, uploadedFile);
             input.value = '';
-            document.getElementById('sendBtn').disabled = true;
+
+            // 准备发送的数据
+            const requestData = {
+                message: message || "请帮我分析这个文件",
+                session_id: sessionId
+            };
+
+            // 如果有图片文件，转换为base64
+            if (uploadedFile && uploadedFile.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    requestData.image = e.target.result;
+                    sendRequest(requestData);
+                };
+                reader.readAsDataURL(uploadedFile);
+            }
+            // 如果有文本文件，读取内容
+            else if (uploadedFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    requestData.message = `${message}\n\n【文件内容】\n${e.target.result}`;
+                    sendRequest(requestData);
+                };
+                reader.readAsText(uploadedFile);
+            }
+            else {
+                sendRequest(requestData);
+            }
+
+            clearFile();
+        }
+
+        function sendRequest(requestData) {
             document.getElementById('typing').classList.add('active');
 
             fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message, session_id: sessionId })
+                body: JSON.stringify(requestData)
             })
             .then(res => {
                 console.log('状态码:', res.status);
@@ -263,16 +369,45 @@
             });
         }
 
-        function addMessage(role, content) {
+        function addMessage(role, content, file = null) {
             const messages = document.getElementById('messages');
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${role}`;
             const avatar = role === 'user' ? '👤' : '🤖';
             const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-            msgDiv.innerHTML = `<div class="message-avatar">${avatar}</div><div class="message-content"><div class="message-text">${content}</div><div class="message-time">${time}</div></div>`;
+
+            let contentHtml = '';
+
+            // 添加图片预览
+            if (file && file.type && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    contentHtml += `<div class="message-image"><img src="${e.target.result}" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-top: 10px;"></div>`;
+                    if (content) {
+                        contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
+                    }
+                    contentHtml += `<div class="message-time">${time}</div>`;
+                    msgDiv.querySelector('.message-content').innerHTML = contentHtml;
+                };
+                reader.readAsDataURL(file);
+            } else if (file) {
+                contentHtml += `<div class="message-file">📎 ${file.name}</div>`;
+                if (content) {
+                    contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
+                }
+                contentHtml += `<div class="message-time">${time}</div>`;
+            } else {
+                contentHtml += `<div class="message-text">${formatContent(content)}</div>`;
+                contentHtml += `<div class="message-time">${time}</div>`;
+            }
+
+            msgDiv.innerHTML = `<div class="message-avatar">${avatar}</div><div class="message-content"></div>`;
             messages.appendChild(msgDiv);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        function formatContent(content) {
+            return content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
         }
     </script>
 </body>

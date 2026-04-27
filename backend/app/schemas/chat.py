@@ -7,8 +7,9 @@ from typing import Optional, List
 
 class ChatRequest(BaseModel):
     """聊天请求"""
-    message: str = Field(..., description="用户消息", min_length=1)
+    message: str = Field(..., description="用户消息")
     session_id: Optional[str] = Field(None, description="会话ID")
+    image: Optional[str] = Field(None, description="图片的base64编码")
 
 
 class ChatResponse(BaseModel):
