@@ -27,6 +27,11 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "https://longzhangguai-ai.loca.lt",
         "https://longzhang-ai-final.loca.lt",
+        "https://longzhangai3.loca.lt",
+        "https://longzhangai-upload.loca.lt",
+        "https://wet-warthog-66.loca.lt",
+        "https://dangerous-lionfish-6.loca.lt",
+        "https://yellow-insect-79.loca.lt",
         "*"  # 开发环境允许所有来源
     ]
 
