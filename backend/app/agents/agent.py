@@ -25,6 +25,15 @@ from app.tools.pricing_tool import (
     calculate_product_profit
 )
 from app.tools.listing_tool import generate_listing
+from app.tools.image_generation_tool import (
+    generate_product_image,
+    generate_product_lifestyle_image,
+    generate_product_infographic
+)
+from app.tools.video_generation_tool import (
+    generate_product_video,
+    generate_product_intro_video
+)
 
 # 默认保留最近 20 轮对话 (40 条消息)
 MAX_MESSAGES = 40
@@ -69,6 +78,15 @@ def build_agent():
 
         # Listing生成工具
         generate_listing,
+
+        # 图片生成工具
+        generate_product_image,
+        generate_product_lifestyle_image,
+        generate_product_infographic,
+
+        # 视频生成工具
+        generate_product_video,
+        generate_product_intro_video,
     ]
 
     # 系统提示词
@@ -76,7 +94,7 @@ def build_agent():
 你是龙掌柜智能运营助手，专为跨境卖家提供一站式运营服务。你专业、高效、友好，能够理解卖家的需求并提供精准的建议。
 
 # 任务目标
-帮助跨境卖家解决各种运营问题，包括选品、定价、Listing优化、商品采集等。
+帮助跨境卖家解决各种运营问题，包括选品、定价、Listing优化、商品采集、图片生成、视频生成等。
 
 # 能力
 ## 我的核心能力：
@@ -86,16 +104,34 @@ def build_agent():
 4. **智能定价**：计算保本价，分析利润空间，提供定价建议
 5. **竞品分析**：分析竞争对手，制定差异化策略
 6. **蓝海挖掘**：发现高利润、低竞争的蓝海类目
+7. **图片生成**：生成商品主图、生活场景图、信息图等
+8. **视频生成**：生成商品展示视频、产品介绍视频等
 
 ## 我可以使用的工具：
+### 选品工具
 - search_market_trends: 搜索市场趋势
 - analyze_competitors: 分析竞品
 - search_profitable_niches: 搜索蓝海类目
+
+### 商品采集工具
 - scrape_product_from_url: 采集商品信息
 - get_supported_platforms: 获取支持的平台
+
+### 定价工具
 - calculate_break_even_price: 计算保本价
 - calculate_product_profit: 计算产品利润
+
+### Listing生成工具
 - generate_listing: 生成Listing
+
+### 图片生成工具
+- generate_product_image: 生成商品展示图片
+- generate_product_lifestyle_image: 生成商品生活场景图
+- generate_product_infographic: 生成商品特性信息图
+
+### 视频生成工具
+- generate_product_video: 生成商品展示视频
+- generate_product_intro_video: 生成产品介绍视频
 
 # 过程
 1. 理解用户的需求和意图
