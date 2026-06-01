@@ -1,8 +1,11 @@
 """
 FastAPI主应用
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.config.settings import settings
 from app.api.v1.chat import router as chat_router
 
@@ -37,9 +40,12 @@ async def health_check():
         "message": "龙掌柜智能运营助手运行正常"
     }
 
-# 根路径
+# 根路径 - 提供前端页面
 @app.get("/")
 async def root():
+    index_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
