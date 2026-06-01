@@ -57,3 +57,4 @@ htmlcov/
 # 其他
 assets/temp/
 tmp/
+.cozeproj/reduction
