@@ -58,3 +58,4 @@ htmlcov/
 assets/temp/
 tmp/
 .cozeproj/reduction
+.codegraph
