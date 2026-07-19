@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -11,6 +11,8 @@ import {
   ExternalLink,
   TrendingUp,
   Package,
+  Trash2,
+  Edit,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,88 +34,99 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const mockProducts = [
-  {
-    id: 'P001',
-    name: '蓝牙耳机 TWS 无线入耳式',
-    platform: 'TikTok Shop',
-    price: '$19.99',
-    cost: '¥25.00',
-    profit: '42%',
-    status: '已上架',
-    stock: 156,
-    image: '🎧',
-  },
-  {
-    id: 'P002',
-    name: '手机壳 iPhone 15 硅胶防摔',
-    platform: 'Shopee',
-    price: '$5.99',
-    cost: '¥3.50',
-    profit: '55%',
-    status: '已上架',
-    stock: 520,
-    image: '📱',
-  },
-  {
-    id: 'P003',
-    name: 'LED 氛围灯 USB 充电星空投影',
-    platform: 'Lazada',
-    price: '$12.99',
-    cost: '¥18.00',
-    profit: '38%',
-    status: '待发布',
-    stock: 89,
-    image: '💡',
-  },
-  {
-    id: 'P004',
-    name: '便携式充电宝 10000mAh 超薄',
-    platform: 'Amazon',
-    price: '$24.99',
-    cost: '¥45.00',
-    profit: '32%',
-    status: '已上架',
-    stock: 234,
-    image: '🔋',
-  },
-  {
-    id: 'P005',
-    name: '迷你风扇 USB 充电桌面静音',
-    platform: 'TikTok Shop',
-    price: '$8.99',
-    cost: '¥12.00',
-    profit: '45%',
-    status: '草稿',
-    stock: 0,
-    image: '🌀',
-  },
-  {
-    id: 'P006',
-    name: '瑜伽垫 TPE 防滑加厚 6mm',
-    platform: 'Shopee',
-    price: '$15.99',
-    cost: '¥22.00',
-    profit: '40%',
-    status: '已上架',
-    stock: 178,
-    image: '🧘',
-  },
-];
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  market: string;
+  source_url: string | null;
+  source_price: string | null;
+  suggested_price: string | null;
+  status: string;
+  platform: string | null;
+  platform_product_id: string | null;
+  data: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const statusColors: Record<string, string> = {
-  '已上架': 'bg-emerald-50 text-emerald-700',
-  '待发布': 'bg-amber-50 text-amber-700',
-  '草稿': 'bg-slate-100 text-slate-600',
-  '已下架': 'bg-red-50 text-red-700',
+  'published': 'bg-emerald-50 text-emerald-700',
+  'pending': 'bg-amber-50 text-amber-700',
+  'draft': 'bg-slate-100 text-slate-600',
+  'removed': 'bg-red-50 text-red-700',
+};
+
+const statusLabels: Record<string, string> = {
+  'published': '已上架',
+  'pending': '待发布',
+  'draft': '草稿',
+  'removed': '已下架',
 };
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredProducts = mockProducts.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fetch products from API
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/products');
+      const data = await response.json();
+      if (data.success) {
+        setProducts(data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('确定要删除这个商品吗？')) return;
+    try {
+      const response = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        setProducts(products.filter(p => p.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete product:', error);
+    }
+  };
+
+  const filteredProducts = products.filter((p) => {
+    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchPlatform = platformFilter === 'all' || p.platform === platformFilter;
+    const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+    return matchSearch && matchPlatform && matchStatus;
+  });
+
+  // Calculate stats
+  const stats = {
+    total: products.length,
+    published: products.filter(p => p.status === 'published').length,
+    pending: products.filter(p => p.status === 'pending').length,
+    avgProfit: products.length > 0
+      ? Math.round(products.reduce((acc, p) => {
+          const source = parseFloat(p.source_price?.replace(/[^0-9.]/g, '') || '0');
+          const suggested = parseFloat(p.suggested_price?.replace(/[^0-9.]/g, '') || '0');
+          if (source > 0 && suggested > 0) {
+            return acc + ((suggested - source) / suggested) * 100;
+          }
+          return acc;
+        }, 0) / products.length)
+      : 0,
+  };
 
   return (
     <div className="p-6">
@@ -140,10 +153,10 @@ export default function ProductsPage() {
       {/* Stats */}
       <div className="mb-6 grid grid-cols-4 gap-4">
         {[
-          { label: '全部商品', value: '28', icon: Package },
-          { label: '已上架', value: '18', icon: ExternalLink },
-          { label: '待发布', value: '6', icon: Upload },
-          { label: '平均利润率', value: '42%', icon: TrendingUp },
+          { label: '全部商品', value: stats.total.toString(), icon: Package },
+          { label: '已上架', value: stats.published.toString(), icon: ExternalLink },
+          { label: '待发布', value: stats.pending.toString(), icon: Upload },
+          { label: '平均利润率', value: `${stats.avgProfit}%`, icon: TrendingUp },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/50">
             <CardContent className="flex items-center gap-3 p-4">
@@ -175,7 +188,7 @@ export default function ProductsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Select defaultValue="all">
+          <Select value={platformFilter} onValueChange={setPlatformFilter}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="平台" />
             </SelectTrigger>
@@ -187,7 +200,7 @@ export default function ProductsPage() {
               <SelectItem value="amazon">Amazon</SelectItem>
             </SelectContent>
           </Select>
-          <Select defaultValue="all">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="状态" />
             </SelectTrigger>
@@ -222,10 +235,22 @@ export default function ProductsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.map((product) => (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-10 text-slate-400">
+                  加载中...
+                </TableCell>
+              </TableRow>
+            ) : filteredProducts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-10 text-slate-400">
+                  暂无商品数据
+                </TableCell>
+              </TableRow>
+            ) : filteredProducts.map((product) => (
               <TableRow key={product.id}>
                 <TableCell>
-                  <span className="text-2xl">{product.image}</span>
+                  <span className="text-2xl">📦</span>
                 </TableCell>
                 <TableCell>
                   <div>
@@ -233,35 +258,37 @@ export default function ProductsPage() {
                       {product.name}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {product.id}
+                      {product.id.slice(0, 8)}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary" className="text-xs">
-                    {product.platform}
+                    {product.platform || '-'}
                   </Badge>
                 </TableCell>
-                <TableCell className="font-medium">{product.price}</TableCell>
+                <TableCell className="font-medium">{product.suggested_price || '-'}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {product.cost}
+                  {product.source_price || '-'}
                 </TableCell>
                 <TableCell>
                   <span className="font-medium text-emerald-600">
-                    {product.profit}
+                    {product.source_price && product.suggested_price
+                      ? `${Math.round(((parseFloat(product.suggested_price.replace(/[^0-9.]/g, '')) - parseFloat(product.source_price.replace(/[^0-9.]/g, ''))) / parseFloat(product.suggested_price.replace(/[^0-9.]/g, ''))) * 100)}%`
+                      : '-'}
                   </span>
                 </TableCell>
-                <TableCell>{product.stock}</TableCell>
+                <TableCell>-</TableCell>
                 <TableCell>
                   <Badge
-                    className={`text-xs ${statusColors[product.status] || ''}`}
+                    className={`text-xs ${statusColors[product.status] || 'bg-slate-100 text-slate-600'}`}
                   >
-                    {product.status}
+                    {statusLabels[product.status] || product.status}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600" onClick={() => handleDelete(product.id)}>
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>

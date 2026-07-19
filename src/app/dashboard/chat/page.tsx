@@ -15,17 +15,35 @@ import {
   Bot,
   User,
   StopCircle,
+  Video,
+  Download,
+  Play,
+  Loader2,
+  Package,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
+// ---- Types ----
+interface SkillData {
+  type: 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize';
+  status: 'running' | 'success' | 'error';
+  data: Record<string, unknown> | null;
+  summary: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  skill?: SkillData;
+  skillRunning?: boolean;
 }
 
 interface Conversation {
@@ -35,11 +53,12 @@ interface Conversation {
   timestamp: Date;
 }
 
+// ---- Preset scenes ----
 const presetScenes = [
-  { icon: TrendingUp, label: '智能选品', prompt: '帮我分析当前热门的 3C 配件品类，推荐 3 个潜力产品，包括市场搜索量、竞争度和预估利润率' },
-  { icon: Calculator, label: '利润计算', prompt: '帮我计算一个商品的利润，进货价 25 元人民币，售价 15.99 美元，国际运费 3 美元，请列出详细的成本明细和利润率' },
-  { icon: FileText, label: 'Listing 优化', prompt: '我在 TikTok Shop 卖蓝牙耳机，帮我写一个吸引人的商品标题和五点描述，要包含核心关键词' },
-  { icon: ImageIcon, label: '运营策略', prompt: '我的店铺刚开业一个月，日均订单只有 3-5 单，帮我制定一个提升销量的运营策略' },
+  { icon: ImageIcon, label: 'AI 作图', prompt: '帮我生成一张便携式蓝牙音箱的白底主图' },
+  { icon: Video, label: 'AI 视频', prompt: '帮我生成一个瑜伽垫的商品展示视频' },
+  { icon: TrendingUp, label: '智能选品', prompt: '推荐几个适合在 TikTok Shop 东南亚市场卖的 3C 电子产品' },
+  { icon: FileText, label: 'Listing 优化', prompt: '帮我优化一个不锈钢保温杯的 Amazon Listing 标题和五点描述' },
 ];
 
 const initialMessages: Message[] = [
@@ -47,10 +66,280 @@ const initialMessages: Message[] = [
     id: 'welcome',
     role: 'assistant',
     content:
-      '你好！我是龙掌柜 AI 运营助手。我可以帮你进行选品分析、利润计算、Listing 优化、运营策略制定等。\n\n你可以直接输入问题，或者选择下方的快捷场景开始。',
+      '你好！我是龙掌柜 AI 运营助手。我可以直接帮你执行以下技能：\n\n- **AI 作图** — 生成商品白底图、场景图、模特图\n- **AI 视频** — 生成商品展示视频、开箱视频\n- **智能选品** — 分析市场趋势，推荐潜力产品\n- **Listing 优化** — 生成标题、五点描述、关键词\n\n直接告诉我你的需求，我会自动调用对应的技能来帮你完成！',
     timestamp: new Date(),
   },
 ];
+
+// ---- Skill Result Renderers ----
+
+function ImageGenCard({ data }: { data: Record<string, unknown> }) {
+  const imageUrls = data.imageUrls as string[];
+  const scene = data.scene as string;
+  const [copied, setCopied] = useState(false);
+
+  const handleDownload = async (url: string, idx: number) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `product-${scene}-${idx + 1}.png`;
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleCopyUrl = async (url: string) => {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <ImageIcon className="h-4 w-4 text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-700">AI 作图 - {scene}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {imageUrls?.map((url: string, i: number) => (
+          <div key={i} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <img src={url} alt={`Generated ${i + 1}`} className="h-32 w-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                onClick={() => handleDownload(url, i)}
+                className="rounded-full bg-white/90 p-1.5 hover:bg-white"
+              >
+                <Download className="h-3.5 w-3.5 text-slate-700" />
+              </button>
+              <button
+                onClick={() => handleCopyUrl(url)}
+                className="rounded-full bg-white/90 p-1.5 hover:bg-white"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-slate-700" />}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[10px] text-emerald-600">
+        已生成 {imageUrls?.length || 0} 张图片，悬浮可下载或复制链接
+      </p>
+    </div>
+  );
+}
+
+function VideoGenCard({ data }: { data: Record<string, unknown> }) {
+  const videoUrl = data.videoUrl as string;
+  const scene = data.scene as string;
+  const ratio = data.ratio as string;
+  const duration = data.duration as number;
+
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(videoUrl);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `product-${scene}.mp4`;
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(videoUrl, '_blank');
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Video className="h-4 w-4 text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-700">AI 视频 - {scene}</span>
+        <span className="text-[10px] text-emerald-500">{ratio} | {duration}s</span>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-900">
+        <video src={videoUrl} controls className="aspect-video w-full object-contain" style={{ maxHeight: '240px' }} />
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          onClick={handleDownload}
+          className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700"
+        >
+          <Download className="h-3 w-3" /> 下载视频
+        </button>
+        <span className="text-[10px] text-emerald-600">视频已生成，可直接播放</span>
+      </div>
+    </div>
+  );
+}
+
+function ProductSelectionCard({ data }: { data: Record<string, unknown> }) {
+  const products = data.products as Array<Record<string, unknown>>;
+  const market = data.market as string;
+  const category = data.category as string;
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-700">智能选品 - {market} {category}</span>
+      </div>
+      <div className="space-y-2">
+        {products?.map((p, i) => (
+          <div key={i} className="rounded-lg border border-slate-200 bg-white p-2.5">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800">{p.name as string}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">{p.category as string}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-semibold text-emerald-600">{p.suggestedPrice as string}</p>
+                <p className="text-[10px] text-slate-400">成本 {p.sourcePrice as string}</p>
+              </div>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">
+                趋势 {p.trendScore as number}
+              </span>
+              <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700">
+                竞争: {p.competition as string}
+              </span>
+              <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                利润 {p.profitMargin as string}
+              </span>
+              <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+                月销 {p.monthlySales as string}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-600 leading-relaxed">{p.reason as string}</p>
+            <p className="mt-1 text-[10px] text-emerald-600">💡 {p.actionAdvice as string}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ListingOptimizeCard({ data }: { data: Record<string, unknown> }) {
+  const title = data.title as string;
+  const bulletPoints = data.bulletPoints as string[];
+  const keywords = data.keywords as string[];
+  const platform = data.platform as string;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAll = () => {
+    const text = `Title: ${title}\n\nBullet Points:\n${bulletPoints?.map((b, i) => `${i + 1}. ${b}`).join('\n')}\n\nKeywords: ${keywords?.join(', ')}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-emerald-700">Listing 优化 - {platform}</span>
+        </div>
+        <button
+          onClick={handleCopyAll}
+          className="flex items-center gap-1 rounded-md border border-emerald-200 px-2 py-1 text-[10px] text-emerald-700 hover:bg-emerald-100"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? '已复制' : '复制全部'}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="rounded-lg bg-white p-2.5 border border-slate-200">
+          <p className="text-[10px] font-medium text-slate-500 mb-1">优化标题</p>
+          <p className="text-sm text-slate-800 font-medium leading-snug">{title}</p>
+        </div>
+
+        <div className="rounded-lg bg-white p-2.5 border border-slate-200">
+          <p className="text-[10px] font-medium text-slate-500 mb-1">五点描述</p>
+          <ul className="space-y-1">
+            {bulletPoints?.map((bp, i) => (
+              <li key={i} className="flex gap-1.5 text-xs text-slate-700">
+                <span className="shrink-0 text-emerald-500">•</span>
+                <span className="leading-relaxed">{bp}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-lg bg-white p-2.5 border border-slate-200">
+          <p className="text-[10px] font-medium text-slate-500 mb-1">关键词</p>
+          <div className="flex flex-wrap gap-1">
+            {keywords?.map((kw, i) => (
+              <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                {kw}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkillRunningCard({ type, label }: { type: string; label: string }) {
+  const icons: Record<string, React.ElementType> = {
+    'image-gen': ImageIcon,
+    'video-gen': Video,
+    'product-selection': TrendingUp,
+    'listing-optimize': FileText,
+  };
+  const Icon = icons[type] || Sparkles;
+
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+        <Icon className="h-4 w-4 text-amber-600" />
+        <span className="text-xs font-medium text-amber-700">
+          正在调用「{label}」技能...
+        </span>
+      </div>
+      <p className="mt-1 text-[10px] text-amber-500">
+        {type === 'video-gen' ? '视频生成通常需要 1-3 分钟，请耐心等待' : 'AI 正在处理中，请稍候...'}
+      </p>
+    </div>
+  );
+}
+
+function SkillResultRenderer({ skill }: { skill: SkillData }) {
+  if (skill.status === 'running' || !skill.data) {
+    return <SkillRunningCard type={skill.type} label={skill.summary || '技能执行中'} />;
+  }
+
+  if (skill.status === 'error') {
+    return (
+      <div className="mt-3 rounded-xl border border-red-200 bg-red-50/50 p-3">
+        <p className="text-xs text-red-600">❌ {skill.summary}</p>
+      </div>
+    );
+  }
+
+  switch (skill.type) {
+    case 'image-gen':
+      return <ImageGenCard data={skill.data} />;
+    case 'video-gen':
+      return <VideoGenCard data={skill.data} />;
+    case 'product-selection':
+      return <ProductSelectionCard data={skill.data} />;
+    case 'listing-optimize':
+      return <ListingOptimizeCard data={skill.data} />;
+    default:
+      return null;
+  }
+}
+
+// ---- Main Component ----
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -137,17 +426,62 @@ export default function ChatPage() {
             const data = line.slice(6);
             if (data === '[DONE]') break;
             try {
-              const parsed = JSON.parse(data) as { content?: string; error?: string };
-              if (parsed.error) {
-                accumulated += `\n\n[错误: ${parsed.error}]`;
-              } else if (parsed.content) {
-                accumulated += parsed.content;
+              const parsed = JSON.parse(data) as Record<string, unknown>;
+
+              if (parsed.type === 'error') {
+                accumulated += `\n\n[错误: ${parsed.error as string}]`;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: accumulated } : m
+                  )
+                );
+              } else if (parsed.type === 'skill-start') {
+                // Show skill running indicator
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          skillRunning: true,
+                          skill: {
+                            type: parsed.skill as string as Message['skill'] extends infer S ? S extends { type: infer T } ? T : never : never,
+                            status: 'running',
+                            data: null,
+                            summary: parsed.label as string,
+                          },
+                        }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'skill-result') {
+                // Update with skill result
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          skillRunning: false,
+                          skill: {
+                            type: parsed.skill as Message['skill'] extends infer S ? S extends { type: infer T } ? T : never : never,
+                            status: parsed.status as 'success' | 'error',
+                            data: parsed.data as Record<string, unknown> | null,
+                            summary: parsed.summary as string,
+                          },
+                        }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'commentary-start') {
+                // LLM commentary begins, reset accumulated for text
+                accumulated = '';
+              } else if (parsed.type === 'text' && parsed.content) {
+                accumulated += parsed.content as string;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId ? { ...m, content: accumulated } : m
+                  )
+                );
               }
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId ? { ...m, content: accumulated } : m
-                )
-              );
             } catch {
               // Skip malformed JSON
             }
@@ -156,7 +490,6 @@ export default function ChatPage() {
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        // User cancelled
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId && !m.content
@@ -267,7 +600,7 @@ export default function ChatPage() {
                 AI 运营助手
               </h2>
               <p className="text-xs text-muted-foreground">
-                支持选品、定价、素材生成等全链路运营
+                支持作图、视频、选品、Listing 优化等技能
               </p>
             </div>
           </div>
@@ -276,7 +609,7 @@ export default function ChatPage() {
               'h-1.5 w-1.5 rounded-full',
               isStreaming ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
             )} />
-            {isStreaming ? '思考中' : '在线'}
+            {isStreaming ? '执行中' : '在线'}
           </Badge>
         </div>
 
@@ -308,21 +641,31 @@ export default function ChatPage() {
                   </div>
                   <div
                     className={cn(
-                      'max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+                      'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
                       msg.role === 'assistant'
                         ? 'rounded-tl-sm bg-white border shadow-sm text-foreground'
                         : 'rounded-tr-sm bg-emerald-600 text-white'
                     )}
                   >
                     <div className="whitespace-pre-wrap">
-                      {msg.content || (
+                      {msg.content || msg.skill?.status === 'running' ? (
+                        msg.content || ''
+                      ) : msg.content === '' && !msg.skill ? (
                         <span className="inline-flex items-center gap-1 text-muted-foreground">
                           <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: '0ms' }} />
                           <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: '150ms' }} />
                           <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: '300ms' }} />
                         </span>
+                      ) : (
+                        msg.content
                       )}
                     </div>
+
+                    {/* Render skill result card */}
+                    {msg.skill && (
+                      <SkillResultRenderer skill={msg.skill} />
+                    )}
+
                     <div
                       className={cn(
                         'mt-2 text-[10px]',
@@ -346,7 +689,7 @@ export default function ChatPage() {
             {messages.length <= 1 && (
               <div className="mt-8">
                 <p className="mb-3 text-center text-xs text-muted-foreground">
-                  选择快捷场景开始
+                  试试这些技能
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {presetScenes.map((scene) => (
@@ -385,7 +728,7 @@ export default function ChatPage() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="输入你的问题... (Enter 发送, Shift+Enter 换行)"
+                placeholder="输入需求，如：帮我生成一张商品图 / 推荐几个热卖产品 / 优化 Listing..."
                 className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                 rows={1}
                 disabled={isStreaming}
@@ -411,7 +754,7 @@ export default function ChatPage() {
             </div>
             <p className="mt-2 text-center text-[10px] text-muted-foreground">
               <Sparkles className="mr-1 inline h-3 w-3" />
-              AI 生成内容仅供参考，请结合实际判断
+              AI 会自动识别并调用对应技能（作图/视频/选品/Listing）
             </p>
           </div>
         </div>

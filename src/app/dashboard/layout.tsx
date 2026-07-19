@@ -17,16 +17,23 @@ import {
   Search,
   ChevronDown,
   Sparkles,
+  Send,
+  Target,
+  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: '概览', exact: true },
+  { href: '/dashboard', icon: LayoutDashboard, label: '工作台', exact: true },
+  { href: '/dashboard/selection', icon: Target, label: 'AI 选品', badge: '热门' },
+  { href: '/dashboard/listing', icon: Send, label: '一键上架', badge: '新' },
   { href: '/dashboard/chat', icon: MessageSquare, label: 'AI 对话', badge: 'AI' },
   { href: '/dashboard/products', icon: Package, label: '商品管理' },
   { href: '/dashboard/assets', icon: ImageIcon, label: '素材中心' },
+  { href: '/dashboard/image-studio', icon: Sparkles, label: 'AI 作图', badge: 'AI' },
+  { href: '/dashboard/video-studio', icon: Video, label: 'AI 视频', badge: 'AI' },
   { href: '/dashboard/analytics', icon: BarChart3, label: '数据分析' },
   { href: '/dashboard/shops', icon: Store, label: '店铺管理' },
 ];

@@ -1,13 +1,46 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bot, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Bot, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email || !password) {
+      setError('请填写邮箱和密码');
+      return;
+    }
+
+    setLoading(true);
+
+    // 模拟登录 - 后续接入真实后端后替换
+    setTimeout(() => {
+      localStorage.setItem(
+        'user',
+        JSON.stringify({
+          name: email.split('@')[0],
+          email,
+          avatar: '',
+        })
+      );
+      setLoading(false);
+      router.push('/dashboard');
+    }, 800);
+  };
+
   return (
     <div className="flex min-h-screen">
       {/* Left side - branding */}
@@ -73,7 +106,7 @@ export default function LoginPage() {
             </Link>
           </p>
 
-          <form className="mt-8 space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">邮箱地址</Label>
               <div className="relative">
@@ -83,6 +116,8 @@ export default function LoginPage() {
                   type="email"
                   placeholder="your@email.com"
                   className="pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
             </div>
@@ -104,16 +139,32 @@ export default function LoginPage() {
                   type="password"
                   placeholder="输入密码"
                   className="pl-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
             </div>
 
+            {error && (
+              <p className="text-sm text-red-500">{error}</p>
+            )}
+
             <Button
               type="submit"
               className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+              disabled={loading}
             >
-              登录
-              <ArrowRight className="ml-2 h-4 w-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  登录中...
+                </>
+              ) : (
+                <>
+                  登录
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
             </Button>
           </form>
 

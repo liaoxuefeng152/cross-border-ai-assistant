@@ -1,0 +1,147 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getReportBuffer, createWrappedFetch } from 'coze-coding-dev-sdk';
+
+let envLoaded = false;
+let cachedClient: SupabaseClient | null = null;
+let cachedClientKey: string | null = null;
+let cachedClientUrl: string | null = null;
+
+interface SupabaseCredentials {
+  url: string;
+  anonKey: string;
+}
+
+function loadEnv(): void {
+  if (envLoaded || (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY)) {
+    envLoaded = true;
+    return;
+  }
+
+  // Try dotenv first
+  try {
+    require('dotenv').config();
+    if (process.env.COZE_SUPABASE_URL && process.env.COZE_SUPABASE_ANON_KEY) {
+      envLoaded = true;
+      return;
+    }
+  } catch {
+    // dotenv not available
+  }
+
+  // If still not loaded, try coze_workload_identity (only once)
+  if (!envLoaded && !process.env.COZE_SUPABASE_URL) {
+    try {
+      const { execSync } = require('child_process');
+      const pythonCode = `
+import os
+import sys
+try:
+    from coze_workload_identity import Client
+    client = Client()
+    env_vars = client.get_project_env_vars()
+    client.close()
+    for env_var in env_vars:
+        print(f"{env_var.key}={env_var.value}")
+except Exception as e:
+    print(f"# Error: {e}", file=sys.stderr)
+`;
+      const output = execSync(`python3 -c '${pythonCode.replace(/'/g, "'\"'\"'")}'`, {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      const lines = output.trim().split('\n');
+      for (const line of lines) {
+        if (line.startsWith('#')) continue;
+        const eqIndex = line.indexOf('=');
+        if (eqIndex > 0) {
+          const key = line.substring(0, eqIndex);
+          let value = line.substring(eqIndex + 1);
+          if ((value.startsWith("'") && value.endsWith("'")) ||
+              (value.startsWith('"') && value.endsWith('"'))) {
+            value = value.slice(1, -1);
+          }
+          if (!process.env[key]) {
+            process.env[key] = value;
+          }
+        }
+      }
+    } catch {
+      // Silently fail
+    }
+  }
+
+  envLoaded = true;
+}
+
+function getSupabaseCredentials(): SupabaseCredentials {
+  loadEnv();
+
+  const url = process.env.COZE_SUPABASE_URL;
+  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
+
+  if (!url) {
+    throw new Error('COZE_SUPABASE_URL is not set');
+  }
+  if (!anonKey) {
+    throw new Error('COZE_SUPABASE_ANON_KEY is not set');
+  }
+
+  return { url, anonKey };
+}
+
+function getSupabaseServiceRoleKey(): string | undefined {
+  loadEnv();
+  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY;
+}
+
+function getSupabaseClient(token?: string): SupabaseClient {
+  const { url, anonKey } = getSupabaseCredentials();
+
+  let key: string;
+  if (token) {
+    key = anonKey;
+  } else {
+    const serviceRoleKey = getSupabaseServiceRoleKey();
+    key = serviceRoleKey ?? anonKey;
+  }
+
+  // Check cache
+  if (cachedClient && cachedClientKey === key && cachedClientUrl === url) {
+    return cachedClient;
+  }
+
+  const globalOptions: Record<string, any> = {};
+  if (token) {
+    globalOptions.headers = { Authorization: `Bearer ${token}` };
+  }
+  try {
+    const buffer = getReportBuffer();
+    if (buffer) {
+      globalOptions.fetch = createWrappedFetch(buffer, 'supabase');
+    }
+  } catch {
+    // Silent — reporting setup failure should not block client creation
+  }
+
+  const client = createClient(url, key, {
+    global: globalOptions,
+    db: {
+      timeout: 60000,
+    },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  // Cache client
+  cachedClient = client;
+  cachedClientKey = key;
+  cachedClientUrl = url;
+
+  return client;
+}
+
+export { loadEnv, getSupabaseCredentials, getSupabaseServiceRoleKey, getSupabaseClient };
