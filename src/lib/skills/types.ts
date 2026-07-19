@@ -4,7 +4,7 @@
  */
 
 // 技能类型
-export type SkillType = 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize';
+export type SkillType = 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize' | 'auto-cs';
 
 // 技能执行状态
 export type SkillStatus = 'running' | 'success' | 'error';
@@ -102,6 +102,28 @@ export interface AdOptimizeResult {
     negativeCount: number;
     boostCount: number;
     wastedSpend: number;
+  };
+}
+
+// 自动客服技能结果
+export interface AutoCSResult {
+  messages: Array<{
+    id: string;
+    original: string;
+    category: 'shipping' | 'return' | 'product' | 'complaint' | 'other';
+    language: string;
+    sentiment: 'positive' | 'neutral' | 'negative';
+    needsReview: boolean;
+    reply: string;
+  }>;
+  summary: {
+    total: number;
+    shipping: number;
+    return: number;
+    product: number;
+    complaint: number;
+    other: number;
+    needsReview: number;
   };
 }
 

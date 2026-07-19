@@ -9,6 +9,7 @@ import { executeVideoGen } from './video-gen';
 import { executeProductSelection } from './product-selection';
 import { executeListingOptimize } from './listing-optimize';
 import { adOptimizeHandler } from './ad-optimize';
+import { executeAutoCS } from './auto-cs';
 
 // 技能注册表
 const skills: SkillDefinition[] = [
@@ -89,6 +90,24 @@ const skills: SkillDefinition[] = [
       /优化.*广告/,
     ],
     execute: adOptimizeHandler.execute,
+  },
+  {
+    type: 'auto-cs',
+    name: '自动客服',
+    description: '智能回复买家消息，支持多语言、批量处理、情感分析和自动分类',
+    keywords: ['客服', '回复买家', '买家消息', 'customer service', 'auto reply', '自动回复', '回复客户', '客户消息', '帮我回复', '买家问', '客户问', '消息回复', '售后', '退换货回复', '物流回复'],
+    patterns: [
+      /帮我回复.*买家/,
+      /回复.*客户/,
+      /自动.*客服/,
+      /买家.*消息/,
+      /客户.*消息/,
+      /回复.*消息/,
+      /customer.*service/,
+      /auto.*reply/,
+      /回复.*邮件/,
+    ],
+    execute: executeAutoCS,
   },
 ];
 

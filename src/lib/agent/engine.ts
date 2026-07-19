@@ -100,6 +100,23 @@ const SKILL_DEFINITIONS = [
       '广告架构太乱了帮我整理',
     ],
   },
+  {
+    id: 'auto-cs',
+    name: '自动客服',
+    description: '智能回复买家消息，支持多语言、批量处理、情感分析和自动分类。可处理物流查询、退换货、产品咨询、投诉等场景。',
+    parameters: {
+      messages: '买家消息内容（支持批量粘贴多条消息）',
+      language: '回复语言: auto(自动检测), en(英文), de(德文), fr(法文), es(西班牙文), ja(日文), it(意大利文)',
+      tone: '回复风格: professional(专业), warm(温暖), concise(简洁)',
+    },
+    triggerExamples: [
+      '帮我回复这些买家消息',
+      '有客户问什么时候发货',
+      '帮我处理售后消息',
+      '回复这个买家邮件',
+      '客户投诉了帮我写回复',
+    ],
+  },
 ];
 
 /**

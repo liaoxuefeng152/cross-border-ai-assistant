@@ -24,6 +24,9 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Headphones,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +35,7 @@ import { cn } from '@/lib/utils';
 
 // ---- Types ----
 interface SkillData {
-  type: 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize';
+  type: 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize' | 'auto-cs';
   status: 'running' | 'success' | 'error';
   data: Record<string, unknown> | null;
   summary: string;
@@ -415,6 +418,114 @@ function AdOptimizeCard({ data }: { data: Record<string, unknown> }) {
   );
 }
 
+function AutoCSCard({ data }: { data: Record<string, unknown> }) {
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const message = data.message as string | undefined;
+  const categories = data.categories as Array<Record<string, unknown>> | undefined;
+  const replies = data.replies as Array<Record<string, unknown>> | undefined;
+  const needsReview = data.needsReview as boolean | undefined;
+
+  if (message) {
+    return (
+      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Headphones className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-emerald-700">自动客服</span>
+        </div>
+        <p className="text-xs text-slate-600 whitespace-pre-line">{message}</p>
+      </div>
+    );
+  }
+
+  const handleCopy = async (text: string, index: number) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleCopyAll = async () => {
+    if (!replies) return;
+    const allText = replies.map((r, i) => `--- 回复 ${i + 1} ---\n${r.reply as string}`).join('\n\n');
+    await navigator.clipboard.writeText(allText);
+    setCopiedIndex(-1);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Headphones className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-emerald-700">自动客服 - 批量回复</span>
+        </div>
+        {replies && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] text-emerald-600 hover:text-emerald-700"
+            onClick={handleCopyAll}
+          >
+            {copiedIndex === -1 ? <><Check className="h-3 w-3 mr-1" />已复制全部</> : <><Copy className="h-3 w-3 mr-1" />复制全部</>}
+          </Button>
+        )}
+      </div>
+
+      {categories && categories.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {categories.map((cat, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px]">
+              {cat.emoji as string} {cat.label as string} × {cat.count as number}
+              {cat.needsReview ? ' ⚠️' : ''}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {replies && replies.length > 0 && (
+        <div className="space-y-2">
+          {replies.map((reply, i) => (
+            <div key={i} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+              <button
+                onClick={() => setExpandedIndex(expandedIndex === i ? null : i)}
+                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] text-slate-400 shrink-0">#{i + 1}</span>
+                  <span className="text-xs text-slate-500 truncate">{reply.category as string}</span>
+                  {(reply.needsReview as boolean) && (
+                    <Badge variant="destructive" className="text-[9px] h-4 px-1">需复核</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 text-[10px] text-slate-400 hover:text-emerald-600"
+                    onClick={(e) => { e.stopPropagation(); handleCopy(reply.reply as string, i); }}
+                  >
+                    {copiedIndex === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                  {expandedIndex === i ? <ChevronUp className="h-3 w-3 text-slate-400" /> : <ChevronDown className="h-3 w-3 text-slate-400" />}
+                </div>
+              </button>
+              {expandedIndex === i && (
+                <div className="px-3 pb-3 pt-1 border-t border-slate-100">
+                  <p className="text-[10px] text-slate-400 mb-1">买家消息：</p>
+                  <p className="text-xs text-slate-500 mb-2 bg-slate-50 rounded p-2">{reply.buyerMessage as string}</p>
+                  <p className="text-[10px] text-slate-400 mb-1">AI 回复：</p>
+                  <p className="text-xs text-slate-700 bg-emerald-50/50 rounded p-2 whitespace-pre-line leading-relaxed">{reply.reply as string}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SkillRunningCard({ type, label }: { type: string; label: string }) {
   const icons: Record<string, React.ElementType> = {
     'image-gen': ImageIcon,
@@ -465,6 +576,8 @@ function SkillResultRenderer({ skill }: { skill: SkillData }) {
       return <ListingOptimizeCard data={skill.data} />;
     case 'ad-optimize':
       return <AdOptimizeCard data={skill.data} />;
+    case 'auto-cs':
+      return <AutoCSCard data={skill.data} />;
     default:
       return null;
   }
