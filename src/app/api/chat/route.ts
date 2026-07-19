@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { processMessage } from "@/lib/agent/engine";
 import type { AgentEvent } from "@/lib/agent/engine";
+import { HeaderUtils } from "coze-coding-dev-sdk";
 
 export async function POST(request: NextRequest) {
   const { messages: userMessages, sessionId } = await request.json();
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
   // Use a default session ID if not provided
   const sid = sessionId || "default-session";
 
+  // Extract forward headers for SDK auth
+  const forwardHeaders = HeaderUtils.extractForwardHeaders(request.headers);
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
         };
 
         // Process the message through the agent engine
-        await processMessage(lastMessageText, sid, onEvent);
+        await processMessage(lastMessageText, sid, onEvent, forwardHeaders);
 
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();

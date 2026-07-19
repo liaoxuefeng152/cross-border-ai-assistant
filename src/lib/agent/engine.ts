@@ -204,7 +204,8 @@ ${skillDescriptions}
 async function planAndExecute(
   userMessage: string,
   sessionId: string,
-  onEvent: (event: AgentEvent) => void
+  onEvent: (event: AgentEvent) => void,
+  headers: Record<string, string> = {}
 ): Promise<string> {
   const client = new LLMClient(new Config());
 
@@ -276,7 +277,7 @@ ${skillList}
           const result = await executeSkill(step.skillId as import('@/lib/skills/types').SkillType, {
             userMessage: step.description,
             extractedParams: step.params,
-            headers: {},
+            headers,
           });
 
           onEvent({
@@ -316,7 +317,8 @@ ${skillList}
 export async function processMessage(
   userMessage: string,
   sessionId: string,
-  onEvent: (event: AgentEvent) => void
+  onEvent: (event: AgentEvent) => void,
+  headers: Record<string, string> = {}
 ): Promise<void> {
   // 1. 保存用户消息
   await saveMessage({
@@ -339,7 +341,7 @@ export async function processMessage(
 
   if (intent.shouldUseSkill && intent.skillId) {
     // 4a. 匹配到技能 → 检查是否需要多步编排
-    const planSummary = await planAndExecute(userMessage, sessionId, onEvent);
+    const planSummary = await planAndExecute(userMessage, sessionId, onEvent, headers);
 
     // 如果 planAndExecute 没有处理（单步），走原来的单步路径
     // 检查是否已经发送了 skill-result 事件
@@ -360,7 +362,7 @@ export async function processMessage(
         {
           userMessage: userMessage,
           extractedParams: intent.extractedParams,
-          headers: {},
+          headers,
         }
       );
 
