@@ -3,38 +3,28 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
   MessageSquare,
   Package,
   ImageIcon,
-  BarChart3,
   Store,
   CreditCard,
   Settings,
   Bot,
-  LogOut,
   Bell,
   Search,
   ChevronDown,
   Sparkles,
-  Send,
-  Target,
-  Video,
+  Puzzle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: '工作台', exact: true },
-  { href: '/dashboard/selection', icon: Target, label: 'AI 选品', badge: '热门' },
-  { href: '/dashboard/listing', icon: Send, label: '一键上架', badge: '新' },
-  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI 对话', badge: 'AI' },
+  { href: '/dashboard/chat', icon: MessageSquare, label: 'AI 助手', badge: 'AI' },
+  { href: '/dashboard/skills', icon: Puzzle, label: '技能中心' },
   { href: '/dashboard/products', icon: Package, label: '商品管理' },
   { href: '/dashboard/assets', icon: ImageIcon, label: '素材中心' },
-  { href: '/dashboard/image-studio', icon: Sparkles, label: 'AI 作图', badge: 'AI' },
-  { href: '/dashboard/video-studio', icon: Video, label: 'AI 视频', badge: 'AI' },
-  { href: '/dashboard/analytics', icon: BarChart3, label: '数据分析' },
   { href: '/dashboard/shops', icon: Store, label: '店铺管理' },
 ];
 
@@ -50,8 +40,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
 
-  const isActive = (href: string, exact?: boolean) => {
-    if (exact) return pathname === href;
+  const isActive = (href: string) => {
     return pathname.startsWith(href);
   };
 
@@ -77,7 +66,7 @@ export default function DashboardLayout({
               href={item.href}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive(item.href, item.exact)
+                isActive(item.href)
                   ? 'bg-emerald-50 text-emerald-700'
                   : 'text-muted-foreground hover:bg-slate-50 hover:text-foreground'
               )}

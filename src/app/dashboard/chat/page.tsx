@@ -55,10 +55,19 @@ interface Conversation {
 
 // ---- Preset scenes ----
 const presetScenes = [
-  { icon: ImageIcon, label: 'AI 作图', prompt: '帮我生成一张便携式蓝牙音箱的白底主图' },
-  { icon: Video, label: 'AI 视频', prompt: '帮我生成一个瑜伽垫的商品展示视频' },
-  { icon: TrendingUp, label: '智能选品', prompt: '推荐几个适合在 TikTok Shop 东南亚市场卖的 3C 电子产品' },
-  { icon: FileText, label: 'Listing 优化', prompt: '帮我优化一个不锈钢保温杯的 Amazon Listing 标题和五点描述' },
+  { icon: ImageIcon, label: 'AI 作图', prompt: '帮我生成一张便携式蓝牙音箱的白底主图', skill: 'image-gen' as const },
+  { icon: Video, label: 'AI 视频', prompt: '帮我生成一个瑜伽垫的商品展示视频', skill: 'video-gen' as const },
+  { icon: TrendingUp, label: '智能选品', prompt: '推荐几个适合在 TikTok Shop 东南亚市场卖的 3C 电子产品', skill: 'product-selection' as const },
+  { icon: FileText, label: 'Listing 优化', prompt: '帮我优化一个不锈钢保温杯的 Amazon Listing 标题和五点描述', skill: 'listing-optimize' as const },
+];
+
+const quickActions = [
+  { label: '生成白底图', prompt: '帮我生成一张产品的白底主图，要求简洁专业' },
+  { label: '生成场景图', prompt: '帮我生成一张产品在生活场景中使用的图片' },
+  { label: '生成展示视频', prompt: '帮我生成一个15秒的商品展示视频' },
+  { label: '分析市场趋势', prompt: '分析一下当前跨境电商的市场趋势和热门品类' },
+  { label: '优化产品标题', prompt: '帮我优化产品标题，让它更有吸引力且符合SEO' },
+  { label: '生成五点描述', prompt: '帮我生成专业的产品五点描述' },
 ];
 
 const initialMessages: Message[] = [
@@ -66,7 +75,7 @@ const initialMessages: Message[] = [
     id: 'welcome',
     role: 'assistant',
     content:
-      '你好！我是龙掌柜 AI 运营助手。我可以直接帮你执行以下技能：\n\n- **AI 作图** — 生成商品白底图、场景图、模特图\n- **AI 视频** — 生成商品展示视频、开箱视频\n- **智能选品** — 分析市场趋势，推荐潜力产品\n- **Listing 优化** — 生成标题、五点描述、关键词\n\n直接告诉我你的需求，我会自动调用对应的技能来帮你完成！',
+      '你好！我是龙掌柜 AI 运营助手。我可以直接帮你执行以下技能：\n\n- **AI 作图** — 生成商品白底图、场景图、模特图\n- **AI 视频** — 生成商品展示视频、开箱视频\n- **智能选品** — 分析市场趋势，推荐潜力产品\n- **Listing 优化** — 生成标题、五点描述、关键词\n\n直接告诉我你的需求，我会自动调用对应的技能来帮你完成！\n\n你也可以去「技能中心」安装更多技能，比如竞品监控、自动客服、利润计算器等。',
     timestamp: new Date(),
   },
 ];
@@ -689,7 +698,7 @@ export default function ChatPage() {
             {messages.length <= 1 && (
               <div className="mt-8">
                 <p className="mb-3 text-center text-xs text-muted-foreground">
-                  试试这些技能
+                  点击技能卡片，一键开始
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {presetScenes.map((scene) => (
@@ -704,8 +713,29 @@ export default function ChatPage() {
                       <span className="text-xs font-medium text-foreground">
                         {scene.label}
                       </span>
+                      <span className="text-[10px] text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5">
+                        技能
+                      </span>
                     </button>
                   ))}
+                </div>
+
+                {/* Quick actions */}
+                <div className="mt-6">
+                  <p className="mb-2 text-center text-xs text-muted-foreground">
+                    快捷指令
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.label}
+                        onClick={() => handleSend(action.prompt)}
+                        className="rounded-full border border-border/50 bg-white px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
