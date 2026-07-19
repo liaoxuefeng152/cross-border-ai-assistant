@@ -92,7 +92,7 @@ export type AgentEvent =
   | { type: 'thinking'; content: string }
   | { type: 'plan'; steps: string[] }
   | { type: 'skill-start'; skill: string; label: string }
-  | { type: 'skill-result'; skill: string; data: SkillResult }
+  | { type: 'skill-result'; skill: string; status: string; data: Record<string, unknown> | null; summary: string }
   | { type: 'step-complete'; step: number; total: number }
   | { type: 'text'; content: string }
   | { type: 'error'; message: string }
@@ -283,7 +283,9 @@ ${skillList}
           onEvent({
             type: 'skill-result',
             skill: step.skillId,
-            data: result,
+            status: result.status,
+            data: result.data as Record<string, unknown> | null,
+            summary: result.summary,
           });
 
           onEvent({
@@ -369,7 +371,9 @@ export async function processMessage(
       onEvent({
         type: 'skill-result',
         skill: intent.skillId!,
-        data: result,
+        status: result.status,
+        data: result.data as Record<string, unknown> | null,
+        summary: result.summary,
       });
 
       // 保存技能执行结果
