@@ -204,7 +204,7 @@ ${skillDescriptions}
 async function planAndExecute(
   userMessage: string,
   sessionId: string,
-  onEvent: (event: AgentEvent) => void,
+  onEvent: (event: AgentEvent) => void | Promise<void>,
   headers: Record<string, string> = {}
 ): Promise<string> {
   const client = new LLMClient(new Config());
@@ -257,7 +257,7 @@ ${skillList}
 
       if (plan.needsMultiStep && plan.steps.length > 1) {
         // 发送计划
-        onEvent({
+        await onEvent({
           type: 'plan',
           steps: plan.steps.map((s) => s.description),
         });
@@ -268,7 +268,7 @@ ${skillList}
           const step = plan.steps[i];
           const skillDef = SKILL_DEFINITIONS.find((s) => s.id === step.skillId);
 
-          onEvent({
+          await onEvent({
             type: 'skill-start',
             skill: step.skillId,
             label: skillDef?.name || step.skillId,
@@ -280,7 +280,7 @@ ${skillList}
             headers,
           });
 
-          onEvent({
+          await onEvent({
             type: 'skill-result',
             skill: step.skillId,
             status: result.status,
@@ -288,7 +288,7 @@ ${skillList}
             summary: result.summary,
           });
 
-          onEvent({
+          await onEvent({
             type: 'step-complete',
             step: i + 1,
             total: plan.steps.length,
@@ -338,7 +338,7 @@ export async function processMessage(
     ]);
 
   // 3. LLM 意图识别
-  onEvent({ type: 'thinking', content: '正在分析您的意图...' });
+  await onEvent({ type: 'thinking', content: '正在分析您的意图...' });
   const intent = await detectIntent(userMessage, conversationContext);
 
   if (intent.shouldUseSkill && intent.skillId) {
@@ -353,7 +353,7 @@ export async function processMessage(
     if (!planSummary) {
       const skillDef = SKILL_DEFINITIONS.find((s) => s.id === intent.skillId);
 
-      onEvent({
+      await onEvent({
         type: 'skill-start',
         skill: intent.skillId!,
         label: skillDef?.name || intent.skillId!,
@@ -368,7 +368,7 @@ export async function processMessage(
         }
       );
 
-      onEvent({
+      await onEvent({
         type: 'skill-result',
         skill: intent.skillId!,
         status: result.status,
@@ -387,7 +387,7 @@ export async function processMessage(
     }
 
     // 5. LLM 解读技能结果
-    onEvent({ type: 'text', content: '' });
+    await onEvent({ type: 'text', content: '' });
     return;
   }
 
@@ -431,7 +431,7 @@ export async function processMessage(
       if (chunk.content) {
         const text = chunk.content.toString();
         fullResponse += text;
-        onEvent({ type: 'text', content: text });
+        await onEvent({ type: 'text', content: text });
       }
     }
 
@@ -443,11 +443,11 @@ export async function processMessage(
     });
   } catch (error) {
     console.error('[Agent] LLM stream failed:', error);
-    onEvent({
+    await onEvent({
       type: 'error',
       message: '抱歉，处理您的请求时遇到了问题，请稍后重试。',
     });
   }
 
-  onEvent({ type: 'done' });
+  await onEvent({ type: 'done' });
 }

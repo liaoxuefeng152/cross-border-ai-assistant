@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { processMessage } from "@/lib/agent/engine";
 import type { AgentEvent } from "@/lib/agent/engine";
 import { HeaderUtils } from "coze-coding-dev-sdk";
+import { saveGeneratedAsset } from "@/lib/agent/asset-saver";
 
 export async function POST(request: NextRequest) {
   const { messages: userMessages, sessionId } = await request.json();
@@ -24,12 +25,30 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       try {
         // Event handler: convert AgentEvent to SSE and send
-        const onEvent = (event: AgentEvent) => {
+        const onEvent = async (event: AgentEvent) => {
           const data = `data: ${JSON.stringify(event)}\n\n`;
           controller.enqueue(encoder.encode(data));
+
+          // Save generated images to assets table
+          if (event.type === "skill-result" && event.skill === "image-gen" && event.status === "success") {
+            const imageData = event.data as { imageUrls?: string[]; prompt?: string; scene?: string };
+            if (imageData?.imageUrls) {
+              for (const url of imageData.imageUrls) {
+                await saveGeneratedAsset(url, imageData.prompt || lastMessageText, "image");
+              }
+            }
+          }
+
+          // Save generated videos to assets table
+          if (event.type === "skill-result" && event.skill === "video-gen" && event.status === "success") {
+            const videoData = event.data as { videoUrl?: string; prompt?: string; scene?: string };
+            if (videoData?.videoUrl) {
+              await saveGeneratedAsset(videoData.videoUrl, videoData.prompt || lastMessageText, "video");
+            }
+          }
         };
 
-        // Process the message through the agent engine
+        // Process the message through the agent engine (engine handles message persistence)
         await processMessage(lastMessageText, sid, onEvent, forwardHeaders);
 
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
