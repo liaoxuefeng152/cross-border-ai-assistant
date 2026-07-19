@@ -422,19 +422,32 @@ function AutoCSCard({ data }: { data: Record<string, unknown> }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  const message = data.message as string | undefined;
-  const categories = data.categories as Array<Record<string, unknown>> | undefined;
-  const replies = data.replies as Array<Record<string, unknown>> | undefined;
-  const needsReview = data.needsReview as boolean | undefined;
+  const messages = data.messages as Array<Record<string, unknown>> | undefined;
+  const summary = data.summary as Record<string, unknown> | undefined;
 
-  if (message) {
+  const categoryLabels: Record<string, string> = {
+    shipping: ' 物流查询',
+    return: '🔄 退换货',
+    product: '❓ 产品咨询',
+    complaint: '🔴 投诉',
+    other: '💬 其他',
+  };
+
+  const sentimentColors: Record<string, string> = {
+    positive: 'text-emerald-600',
+    neutral: 'text-slate-500',
+    negative: 'text-amber-600',
+    angry: 'text-red-600',
+  };
+
+  if (!messages || messages.length === 0) {
     return (
       <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2">
           <Headphones className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-emerald-700">自动客服</span>
         </div>
-        <p className="text-xs text-slate-600 whitespace-pre-line">{message}</p>
+        <p className="text-xs text-slate-500 mt-2">请粘贴买家消息内容</p>
       </div>
     );
   }
@@ -446,12 +459,14 @@ function AutoCSCard({ data }: { data: Record<string, unknown> }) {
   };
 
   const handleCopyAll = async () => {
-    if (!replies) return;
-    const allText = replies.map((r, i) => `--- 回复 ${i + 1} ---\n${r.reply as string}`).join('\n\n');
+    const allText = messages.map((m, i) => `--- 回复 ${i + 1} ---\n${m.reply as string}`).join('\n\n');
     await navigator.clipboard.writeText(allText);
     setCopiedIndex(-1);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
+
+  const total = (summary?.total as number) || messages.length;
+  const needsReviewCount = (summary?.needsReview as number) || messages.filter(m => m.needsReview).length;
 
   return (
     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
@@ -460,50 +475,51 @@ function AutoCSCard({ data }: { data: Record<string, unknown> }) {
           <Headphones className="h-4 w-4 text-emerald-600" />
           <span className="text-xs font-semibold text-emerald-700">自动客服 - 批量回复</span>
         </div>
-        {replies && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] text-emerald-600 hover:text-emerald-700"
-            onClick={handleCopyAll}
-          >
-            {copiedIndex === -1 ? <><Check className="h-3 w-3 mr-1" />已复制全部</> : <><Copy className="h-3 w-3 mr-1" />复制全部</>}
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 text-[10px] text-emerald-600 hover:text-emerald-700"
+          onClick={handleCopyAll}
+        >
+          {copiedIndex === -1 ? <><Check className="h-3 w-3 mr-1" />已复制全部</> : <><Copy className="h-3 w-3 mr-1" />复制全部</>}
+        </Button>
       </div>
 
-      {categories && categories.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {categories.map((cat, i) => (
-            <Badge key={i} variant="secondary" className="text-[10px]">
-              {cat.emoji as string} {cat.label as string} × {cat.count as number}
-              {cat.needsReview ? ' ⚠️' : ''}
-            </Badge>
-          ))}
-        </div>
-      )}
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        <Badge variant="secondary" className="text-[10px]">共 {total} 条</Badge>
+        {Object.entries(categoryLabels).map(([key, label]) => {
+          const count = summary?.[key] as number || 0;
+          if (count === 0) return null;
+          return <Badge key={key} variant="secondary" className="text-[10px]">{label} × {count}</Badge>;
+        })}
+        {needsReviewCount > 0 && <Badge variant="destructive" className="text-[10px]">⚠️ {needsReviewCount} 条需复核</Badge>}
+      </div>
 
-      {replies && replies.length > 0 && (
-        <div className="space-y-2">
-          {replies.map((reply, i) => (
-            <div key={i} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="space-y-2">
+        {messages.map((msg, i) => {
+          const cat = msg.category as string;
+          const sentiment = msg.sentiment as string;
+          const needsReview = msg.needsReview as boolean;
+          const reply = msg.reply as string;
+          const original = msg.original as string;
+
+          return (
+            <div key={(msg.id as string) || i} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
               <button
                 onClick={() => setExpandedIndex(expandedIndex === i ? null : i)}
                 className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[10px] text-slate-400 shrink-0">#{i + 1}</span>
-                  <span className="text-xs text-slate-500 truncate">{reply.category as string}</span>
-                  {(reply.needsReview as boolean) && (
-                    <Badge variant="destructive" className="text-[9px] h-4 px-1">需复核</Badge>
-                  )}
+                  <span className="text-xs text-slate-500 truncate">{categoryLabels[cat] || cat}</span>
+                  {needsReview && <Badge variant="destructive" className="text-[9px] h-4 px-1">需复核</Badge>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-5 text-[10px] text-slate-400 hover:text-emerald-600"
-                    onClick={(e) => { e.stopPropagation(); handleCopy(reply.reply as string, i); }}
+                    onClick={(e) => { e.stopPropagation(); handleCopy(reply, i); }}
                   >
                     {copiedIndex === i ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   </Button>
@@ -511,17 +527,26 @@ function AutoCSCard({ data }: { data: Record<string, unknown> }) {
                 </div>
               </button>
               {expandedIndex === i && (
-                <div className="px-3 pb-3 pt-1 border-t border-slate-100">
-                  <p className="text-[10px] text-slate-400 mb-1">买家消息：</p>
-                  <p className="text-xs text-slate-500 mb-2 bg-slate-50 rounded p-2">{reply.buyerMessage as string}</p>
-                  <p className="text-[10px] text-slate-400 mb-1">AI 回复：</p>
-                  <p className="text-xs text-slate-700 bg-emerald-50/50 rounded p-2 whitespace-pre-line leading-relaxed">{reply.reply as string}</p>
+                <div className="border-t border-slate-100 p-3 space-y-2">
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">买家消息</div>
+                    <p className="text-xs text-slate-600 bg-slate-50 rounded-lg p-2">{original}</p>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">AI 回复</div>
+                    <p className="text-xs text-slate-700 bg-emerald-50 rounded-lg p-2 whitespace-pre-line">{reply}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] ${sentimentColors[sentiment] || 'text-slate-400'}`}>
+                      情绪: {sentiment || 'neutral'}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
