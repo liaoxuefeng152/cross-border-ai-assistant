@@ -83,6 +83,23 @@ const SKILL_DEFINITIONS = [
       '帮我做一下 Listing 优化',
     ],
   },
+  {
+    id: 'ad-optimize',
+    name: '广告优化',
+    description: '分析亚马逊广告报告，提供 ACoS 优化、搜索词分析、广告架构优化、新品广告策略建议',
+    parameters: {
+      adData: '广告报告数据（CSV 格式，可选）',
+      asin: '产品 ASIN（可选）',
+      focusArea: '关注领域: acos(ACoS 优化), searchTerms(搜索词分析), structure(架构优化), newProduct(新品策略)',
+    },
+    triggerExamples: [
+      '帮我优化广告',
+      'ACoS 太高了怎么办',
+      '分析下最近的搜索词报告',
+      '新品上架怎么打广告',
+      '广告架构太乱了帮我整理',
+    ],
+  },
 ];
 
 /**
