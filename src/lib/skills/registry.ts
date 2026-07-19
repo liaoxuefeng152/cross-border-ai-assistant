@@ -8,6 +8,7 @@ import { executeImageGen } from './image-gen';
 import { executeVideoGen } from './video-gen';
 import { executeProductSelection } from './product-selection';
 import { executeListingOptimize } from './listing-optimize';
+import { adOptimizeHandler } from './ad-optimize';
 
 // 技能注册表
 const skills: SkillDefinition[] = [
@@ -71,6 +72,23 @@ const skills: SkillDefinition[] = [
       /bullet.?points?/i,
     ],
     execute: executeListingOptimize,
+  },
+  {
+    type: 'ad-optimize',
+    name: '广告优化',
+    description: '分析亚马逊广告报告，提供 ACoS 优化、搜索词分析、广告架构优化建议',
+    keywords: ['广告', 'acos', 'roas', '搜索词', '竞价', '否定', 'campaign', 'sponsored', 'ppc', 'cpc', '广告优化', '广告分析', '广告报告'],
+    patterns: [
+      /广告.*优化/,
+      /广告.*分析/,
+      /广告.*报告/,
+      /acos.*优化/,
+      /搜索词.*分析/,
+      /否定.*关键词/,
+      /竞价.*调整/,
+      /优化.*广告/,
+    ],
+    execute: adOptimizeHandler.execute,
   },
 ];
 

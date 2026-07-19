@@ -32,7 +32,7 @@ interface Skill {
   name: string;
   description: string;
   icon: React.ElementType;
-  category: 'content' | 'selection' | 'operation' | 'data' | 'third-party';
+  category: 'content' | 'selection' | 'operation' | 'data' | 'third-party' | 'marketing';
   installed: boolean;
   enabled: boolean;
   isBuiltIn: boolean;
@@ -91,6 +91,18 @@ const builtInSkills: Skill[] = [
     isBuiltIn: true,
     usageCount: 203,
     triggerHint: '对话中说"帮我优化这个产品的标题"',
+  },
+  {
+    id: 'ad-optimize',
+    name: '广告优化',
+    description: '分析亚马逊广告报告，提供 ACoS 优化、搜索词分析、广告架构建议',
+    icon: BarChart3,
+    category: 'marketing',
+    installed: true,
+    enabled: true,
+    isBuiltIn: true,
+    usageCount: 45,
+    triggerHint: '对话中说"帮我分析下广告报告"或粘贴搜索词数据',
   },
   {
     id: 'data-insight',
@@ -212,6 +224,7 @@ const categories = [
   { id: 'content', label: '内容创作' },
   { id: 'selection', label: '选品分析' },
   { id: 'operation', label: '运营工具' },
+  { id: 'marketing', label: '营销推广' },
   { id: 'data', label: '数据分析' },
 ];
 

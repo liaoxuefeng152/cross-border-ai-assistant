@@ -4,7 +4,7 @@
  */
 
 // 技能类型
-export type SkillType = 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize';
+export type SkillType = 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize';
 
 // 技能执行状态
 export type SkillStatus = 'running' | 'success' | 'error';
@@ -59,6 +59,50 @@ export interface ListingOptimizeResult {
   description: string;
   keywords: string[];
   platform: string;
+}
+
+// 广告优化技能结果
+export interface AdOptimizeResult {
+  analysisType: string;
+  metrics?: {
+    acos: number;
+    roas: number;
+    spend: number;
+    orders: number;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    cvr: number;
+    trend: 'up' | 'down' | 'stable';
+  };
+  searchTerms?: Array<{
+    term: string;
+    clicks: number;
+    spend: number;
+    orders: number;
+    acos: number;
+    recommendation: 'negative' | 'boost' | 'exact' | 'watch';
+    reason: string;
+  }>;
+  recommendations?: Array<{
+    type: 'negative' | 'boost' | 'budget' | 'structure' | 'keyword';
+    priority: 'high' | 'medium' | 'low';
+    title: string;
+    description: string;
+    impact: string;
+  }>;
+  strategy?: string;
+  message?: string;
+  sampleFormat?: string;
+  category?: string;
+  price?: number;
+  targetAcos?: number;
+  summary?: {
+    totalTerms: number;
+    negativeCount: number;
+    boostCount: number;
+    wastedSpend: number;
+  };
 }
 
 // 技能定义

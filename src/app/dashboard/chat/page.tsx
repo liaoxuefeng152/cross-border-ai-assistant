@@ -13,6 +13,7 @@ import {
   FileText,
   ImageIcon,
   Bot,
+  BarChart3,
   User,
   StopCircle,
   Video,
@@ -31,7 +32,7 @@ import { cn } from '@/lib/utils';
 
 // ---- Types ----
 interface SkillData {
-  type: 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize';
+  type: 'image-gen' | 'video-gen' | 'product-selection' | 'listing-optimize' | 'ad-optimize';
   status: 'running' | 'success' | 'error';
   data: Record<string, unknown> | null;
   summary: string;
@@ -296,12 +297,131 @@ function ListingOptimizeCard({ data }: { data: Record<string, unknown> }) {
   );
 }
 
+function AdOptimizeCard({ data }: { data: Record<string, unknown> }) {
+  const analysisType = data.analysisType as string;
+  const metrics = data.metrics as Record<string, unknown> | undefined;
+  const searchTerms = data.searchTerms as Array<Record<string, unknown>> | undefined;
+  const recommendations = data.recommendations as Array<Record<string, unknown>> | undefined;
+  const strategy = data.strategy as string | undefined;
+  const message = data.message as string | undefined;
+
+  if (message) {
+    return (
+      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <BarChart3 className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-emerald-700">广告优化</span>
+        </div>
+        <p className="text-xs text-slate-600 whitespace-pre-line">{message}</p>
+      </div>
+    );
+  }
+
+  if (strategy) {
+    return (
+      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <BarChart3 className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-emerald-700">新品广告策略</span>
+        </div>
+        <div className="prose prose-sm max-w-none text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+          {strategy}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-700">广告诊断报告</span>
+      </div>
+
+      {metrics && (
+        <div className="mb-3 grid grid-cols-4 gap-2">
+          <div className="rounded-lg bg-white p-2 border border-slate-200 text-center">
+            <p className="text-[10px] text-slate-500">ACoS</p>
+            <p className={`text-sm font-bold ${(metrics.acos as number) > 30 ? 'text-red-500' : 'text-emerald-600'}`}>
+              {metrics.acos as number}%
+            </p>
+          </div>
+          <div className="rounded-lg bg-white p-2 border border-slate-200 text-center">
+            <p className="text-[10px] text-slate-500">ROAS</p>
+            <p className="text-sm font-bold text-emerald-600">{metrics.roas as number}</p>
+          </div>
+          <div className="rounded-lg bg-white p-2 border border-slate-200 text-center">
+            <p className="text-[10px] text-slate-500">花费</p>
+            <p className="text-sm font-bold text-slate-700">${metrics.spend as number}</p>
+          </div>
+          <div className="rounded-lg bg-white p-2 border border-slate-200 text-center">
+            <p className="text-[10px] text-slate-500">订单</p>
+            <p className="text-sm font-bold text-slate-700">{metrics.orders as number}</p>
+          </div>
+        </div>
+      )}
+
+      {recommendations && recommendations.length > 0 && (
+        <div className="mb-3 space-y-2">
+          <p className="text-[10px] font-medium text-slate-500">优化建议</p>
+          {recommendations.map((rec, i) => (
+            <div key={i} className="rounded-lg bg-white p-2 border border-slate-200">
+              <div className="flex items-start gap-2">
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  rec.priority === 'high' ? 'bg-red-100 text-red-700' :
+                  rec.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  {rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-800">{rec.title as string}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-600 whitespace-pre-line">{rec.description as string}</p>
+                  <p className="mt-1 text-[10px] text-emerald-600">💡 {rec.impact as string}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {searchTerms && searchTerms.length > 0 && (
+        <div>
+          <p className="text-[10px] font-medium text-slate-500 mb-1">搜索词分析 (Top {Math.min(searchTerms.length, 10)})</p>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {searchTerms.slice(0, 10).map((term, i) => (
+              <div key={i} className="flex items-center justify-between rounded bg-white px-2 py-1.5 border border-slate-200 text-[11px]">
+                <span className="font-medium text-slate-700 truncate flex-1">{term.term as string}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-500">点击:{term.clicks as number}</span>
+                  <span className="text-slate-500">ACoS:{term.acos as number}%</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${
+                    term.recommendation === 'negative' ? 'bg-red-100 text-red-700' :
+                    term.recommendation === 'boost' ? 'bg-emerald-100 text-emerald-700' :
+                    term.recommendation === 'exact' ? 'bg-blue-100 text-blue-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {term.recommendation === 'negative' ? '否定' :
+                     term.recommendation === 'boost' ? '加价' :
+                     term.recommendation === 'exact' ? '精准' : '观察'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SkillRunningCard({ type, label }: { type: string; label: string }) {
   const icons: Record<string, React.ElementType> = {
     'image-gen': ImageIcon,
     'video-gen': Video,
     'product-selection': TrendingUp,
     'listing-optimize': FileText,
+    'ad-optimize': BarChart3,
   };
   const Icon = icons[type] || Sparkles;
 
@@ -343,6 +463,8 @@ function SkillResultRenderer({ skill }: { skill: SkillData }) {
       return <ProductSelectionCard data={skill.data} />;
     case 'listing-optimize':
       return <ListingOptimizeCard data={skill.data} />;
+    case 'ad-optimize':
+      return <AdOptimizeCard data={skill.data} />;
     default:
       return null;
   }
