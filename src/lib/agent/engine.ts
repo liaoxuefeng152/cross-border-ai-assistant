@@ -11,6 +11,7 @@ import { detectSkill, executeSkill } from '@/lib/skills/registry';
 import type { SkillResult } from '@/lib/skills/types';
 import { buildConversationContext, saveMessage, buildUserProfileContext } from './memory';
 import { buildKnowledgeContext } from './knowledge';
+import { getSkillQuestionnaire } from './questionnaire';
 
 const USER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -130,7 +131,19 @@ export type AgentEvent =
   | { type: 'step-complete'; step: number; total: number }
   | { type: 'text'; content: string }
   | { type: 'error'; message: string }
-  | { type: 'done' };
+  | { type: 'done' }
+  | {
+      type: 'collect-requirements';
+      skill: string;
+      questions: Array<{
+        id: string;
+        question: string;
+        type: string;
+        options?: Array<{ label: string; value: string }>;
+        placeholder?: string;
+        required: boolean;
+      }>;
+    };
 
 /**
  * LLM 意图识别结果
@@ -376,7 +389,20 @@ export async function processMessage(
   const intent = await detectIntent(userMessage, conversationContext);
 
   if (intent.shouldUseSkill && intent.skillId) {
-    // 4a. 匹配到技能 → 检查是否需要多步编排
+    // 4a. 匹配到技能 → 检查是否需要需求收集
+    const questionnaire = getSkillQuestionnaire(intent.skillId);
+
+    if (questionnaire) {
+      // 有问卷 → 发送需求收集事件，等待用户回答
+      await onEvent({
+        type: 'collect-requirements',
+        skill: intent.skillId!,
+        questions: questionnaire.questions,
+      });
+      return;
+    }
+
+    // 没有问卷 → 直接执行技能
     const planSummary = await planAndExecute(userMessage, sessionId, onEvent, headers);
 
     // 如果 planAndExecute 没有处理（单步），走原来的单步路径

@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { QuestionnaireForm } from '@/components/questionnaire-form';
 
 // ---- Types ----
 interface SkillData {
@@ -617,6 +618,17 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [pendingQuestions, setPendingQuestions] = useState<{
+    skillId: string;
+    questions: Array<{
+      id: string;
+      question: string;
+      type: 'single_choice' | 'multi_choice' | 'text' | 'number';
+      options?: Array<{ label: string; value: string }>;
+      placeholder?: string;
+      required?: boolean;
+    }>;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -897,6 +909,27 @@ export default function ChatPage() {
                     m.id === assistantMsgId ? { ...m, content: accumulated } : m
                   )
                 );
+              } else if (parsed.type === 'collect-requirements') {
+                // 需求收集：显示问题卡片
+                setPendingQuestions({
+                  skillId: parsed.skill as string,
+                  questions: parsed.questions as Array<{
+                    id: string;
+                    question: string;
+                    type: 'single_choice' | 'multi_choice' | 'text' | 'number';
+                    options?: Array<{ label: string; value: string }>;
+                    placeholder?: string;
+                    required?: boolean;
+                  }>,
+                });
+                // 更新助手消息，显示"等待用户回答"
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? { ...m, content: '请回答以下问题，我会根据你的需求来执行任务：' }
+                      : m
+                  )
+                );
               }
             } catch {
               // Skip malformed JSON
@@ -930,6 +963,81 @@ export default function ChatPage() {
 
   const handleStop = () => {
     abortControllerRef.current?.abort();
+  };
+
+  const handleSubmitAnswers = async (answers: Record<string, string | string[]>) => {
+    if (!pendingQuestions || !currentSessionId) return;
+
+    setPendingQuestions(null);
+
+    // 添加用户答案到消息列表
+    const answerText = Object.entries(answers)
+      .map(([key, value]) => {
+        const question = pendingQuestions.questions.find((q) => q.id === key);
+        const answer = Array.isArray(value) ? value.join('、') : value;
+        return `${question?.question || key}: ${answer}`;
+      })
+      .join('\n');
+
+    const userMsg: Message = {
+      id: `msg-${Date.now()}`,
+      role: 'user',
+      content: answerText,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+
+    // 调用执行技能 API
+    try {
+      const response = await fetch('/api/skills/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillId: pendingQuestions.skillId,
+          sessionId: currentSessionId,
+          answers,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 添加技能结果到消息列表
+        const assistantMsg: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: 'assistant',
+          content: result.summary || '任务执行完成',
+          timestamp: new Date(),
+          skill: {
+            type: pendingQuestions.skillId as Message['skill'] extends infer S ? S extends { type: infer T } ? T : never : never,
+            status: 'success',
+            data: result.data,
+            summary: result.summary,
+          },
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const assistantMsg: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: 'assistant',
+          content: `执行失败：${result.error}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
+    } catch (error) {
+      const assistantMsg: Message = {
+        id: `msg-${Date.now() + 1}`,
+        role: 'assistant',
+        content: '抱歉，执行失败，请稍后重试。',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    }
+  };
+
+  const handleSkipQuestions = () => {
+    setPendingQuestions(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1143,6 +1251,24 @@ export default function ChatPage() {
             )}
           </div>
         </ScrollArea>
+
+        {/* Requirements Collection Card */}
+        {pendingQuestions && (
+          <div className="border-t bg-slate-50 px-4 py-4">
+            <div className="mx-auto max-w-3xl">
+              <div className="rounded-xl border bg-white p-4 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold text-foreground">
+                  请回答以下问题，我会根据你的需求来执行任务：
+                </h3>
+                <QuestionnaireForm
+                  questions={pendingQuestions.questions}
+                  onSubmit={handleSubmitAnswers}
+                  onSkip={handleSkipQuestions}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Input area */}
         <div className="border-t bg-white px-4 py-4">
