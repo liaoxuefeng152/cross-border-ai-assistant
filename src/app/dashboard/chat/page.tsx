@@ -682,7 +682,7 @@ export default function ChatPage() {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '新对话' }),
+        body: JSON.stringify({ title: '新任务' }),
       });
       const json = await res.json();
       if (json.success) {
@@ -702,9 +702,9 @@ export default function ChatPage() {
     }
   }, []);
 
-  // 清空所有对话记录
+  // 清空所有任务记录
   const handleClearAll = useCallback(async () => {
-    if (!confirm('确定要清空所有对话记录吗？此操作不可恢复。')) return;
+    if (!confirm('确定要清空所有任务记录吗？此操作不可恢复。')) return;
 
     try {
       const res = await fetch('/api/sessions/clear', {
@@ -760,9 +760,9 @@ export default function ChatPage() {
         console.error('Failed to create session:', e);
       }
     } else {
-      // 如果当前会话标题是"新对话"，用第一条消息更新标题
+      // 如果当前会话标题是"新任务"，用第一条消息更新标题
       const currentConv = conversations.find((c) => c.id === sessionId);
-      if (currentConv && currentConv.title === '新对话') {
+      if (currentConv && currentConv.title === '新任务') {
         try {
           await fetch(`/api/sessions/${sessionId}`, {
             method: 'PATCH',
@@ -951,14 +951,14 @@ export default function ChatPage() {
             onClick={handleNewChat}
           >
             <Plus className="h-3.5 w-3.5" />
-            新建对话
+            新建任务
           </Button>
         </div>
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-1">
             {conversations.length === 0 && (
               <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-                暂无历史对话
+                暂无历史任务
               </p>
             )}
             {conversations.map((conv) => (
@@ -993,7 +993,7 @@ export default function ChatPage() {
             onClick={handleClearAll}
           >
             <Trash2 className="h-3.5 w-3.5" />
-            清空对话记录
+            清空任务记录
           </Button>
         </div>
       </div>
