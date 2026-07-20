@@ -759,6 +759,25 @@ export default function ChatPage() {
       } catch (e) {
         console.error('Failed to create session:', e);
       }
+    } else {
+      // 如果当前会话标题是"新对话"，用第一条消息更新标题
+      const currentConv = conversations.find((c) => c.id === sessionId);
+      if (currentConv && currentConv.title === '新对话') {
+        try {
+          await fetch(`/api/sessions/${sessionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: messageText.slice(0, 30) }),
+          });
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === sessionId ? { ...c, title: messageText.slice(0, 30) } : c
+            )
+          );
+        } catch (e) {
+          console.error('Failed to update session title:', e);
+        }
+      }
     }
 
     idCounter.current += 1;
