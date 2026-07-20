@@ -1,6 +1,11 @@
 import { SkillExecuteParams, SkillResult, ImageGenResult } from './types';
 import { ImageGenerationClient, Config } from 'coze-coding-dev-sdk';
 
+// 开发环境禁用 SSL 证书验证（仅用于解决 localhost 证书不匹配问题）
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 export async function executeImageGen(params: SkillExecuteParams): Promise<SkillResult> {
   const { userMessage, extractedParams, headers } = params;
 
