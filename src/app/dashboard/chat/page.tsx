@@ -629,6 +629,7 @@ export default function ChatPage() {
       required?: boolean;
     }>;
   } | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -973,6 +974,7 @@ export default function ChatPage() {
     }
 
     setPendingQuestions(null);
+    setIsExecuting(true);
 
     // 添加用户答案到消息列表
     const answerText = Object.entries(answers)
@@ -991,6 +993,15 @@ export default function ChatPage() {
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    // 添加加载状态消息
+    const loadingMsg: Message = {
+      id: 'msg-loading',
+      role: 'assistant',
+      content: '正在执行任务，请稍候...',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, loadingMsg]);
+
     // 调用执行技能 API
     try {
       const response = await fetch('/api/skills/execute', {
@@ -1005,6 +1016,9 @@ export default function ChatPage() {
 
       const result = await response.json();
       console.log('[Chat] Skill execute result:', result);
+
+      // 移除加载状态消息
+      setMessages((prev) => prev.filter((m) => m.id !== 'msg-loading'));
 
       if (result.success) {
         // 添加技能结果到消息列表
@@ -1031,6 +1045,9 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, assistantMsg]);
       }
     } catch (error) {
+      console.error('[Chat] Skill execute error:', error);
+      // 移除加载状态消息
+      setMessages((prev) => prev.filter((m) => m.id !== 'msg-loading'));
       const assistantMsg: Message = {
         id: `msg-${Date.now() + 1}`,
         role: 'assistant',
@@ -1038,6 +1055,8 @@ export default function ChatPage() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
+      setIsExecuting(false);
     }
   };
 
