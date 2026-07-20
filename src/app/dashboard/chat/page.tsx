@@ -702,6 +702,26 @@ export default function ChatPage() {
     }
   }, []);
 
+  // 清空所有对话记录
+  const handleClearAll = useCallback(async () => {
+    if (!confirm('确定要清空所有对话记录吗？此操作不可恢复。')) return;
+
+    try {
+      const res = await fetch('/api/sessions/clear', {
+        method: 'POST',
+      });
+      const json = await res.json();
+      if (json.success) {
+        setConversations([]);
+        setActiveConvId(null);
+        setCurrentSessionId(null);
+        setMessages(initialMessages);
+      }
+    } catch (e) {
+      console.error('Failed to clear sessions:', e);
+    }
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -951,7 +971,7 @@ export default function ChatPage() {
             variant="ghost"
             size="sm"
             className="w-full justify-start gap-2 text-xs text-muted-foreground"
-            onClick={handleNewChat}
+            onClick={handleClearAll}
           >
             <Trash2 className="h-3.5 w-3.5" />
             清空对话记录
