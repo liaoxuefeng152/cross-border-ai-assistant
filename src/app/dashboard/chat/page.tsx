@@ -966,7 +966,11 @@ export default function ChatPage() {
   };
 
   const handleSubmitAnswers = async (answers: Record<string, string | string[]>) => {
-    if (!pendingQuestions || !currentSessionId) return;
+    console.log('[Chat] handleSubmitAnswers called with:', answers);
+    if (!pendingQuestions || !currentSessionId) {
+      console.log('[Chat] Missing pendingQuestions or currentSessionId');
+      return;
+    }
 
     setPendingQuestions(null);
 
@@ -1000,6 +1004,7 @@ export default function ChatPage() {
       });
 
       const result = await response.json();
+      console.log('[Chat] Skill execute result:', result);
 
       if (result.success) {
         // 添加技能结果到消息列表

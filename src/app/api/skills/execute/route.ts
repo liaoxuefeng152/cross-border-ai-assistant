@@ -34,11 +34,13 @@ export async function POST(request: NextRequest) {
     const skillParams = questionnaire.buildParams(answers);
 
     // 执行技能
+    console.log('[Skills Execute] Executing skill:', skillId, 'with params:', skillParams);
     const result = await executeSkill(skillId, {
       userMessage: JSON.stringify(answers),
       extractedParams: skillParams as Record<string, string>,
       headers: Object.fromEntries(request.headers),
     });
+    console.log('[Skills Execute] Skill result:', result);
 
     // 保存技能执行结果
     await saveMessage({
