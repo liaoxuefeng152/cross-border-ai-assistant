@@ -614,12 +614,93 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [conversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const idCounter = useRef(0);
+
+  // 加载会话列表
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const res = await fetch('/api/sessions');
+        const json = await res.json();
+        if (json.success) {
+          const convs: Conversation[] = json.data.map((s: { id: string; title: string; updated_at: string }) => ({
+            id: s.id,
+            title: s.title,
+            lastMessage: '',
+            timestamp: new Date(s.updated_at),
+          }));
+          setConversations(convs);
+        }
+      } catch (e) {
+        console.error('Failed to load sessions:', e);
+      }
+    };
+    loadSessions();
+  }, []);
+
+  // 加载会话消息
+  const loadSessionMessages = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/messages`);
+      const json = await res.json();
+      if (json.success) {
+        const loadedMessages: Message[] = json.data.map((m: { id: string; role: string; content: string; created_at: string; skill_type: string; skill_result: string }) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: new Date(m.created_at),
+          skill: m.skill_type ? {
+            type: m.skill_type as Message['skill'] extends infer S ? S extends { type: infer T } ? T : never : never,
+            status: 'success',
+            data: m.skill_result ? JSON.parse(m.skill_result) : null,
+            summary: '',
+          } : undefined,
+        }));
+        setMessages(loadedMessages.length > 0 ? loadedMessages : initialMessages);
+      }
+    } catch (e) {
+      console.error('Failed to load session messages:', e);
+    }
+  }, []);
+
+  // 切换会话
+  const handleSwitchSession = useCallback((sessionId: string) => {
+    setActiveConvId(sessionId);
+    setCurrentSessionId(sessionId);
+    loadSessionMessages(sessionId);
+  }, [loadSessionMessages]);
+
+  // 创建新会话
+  const handleNewChat = useCallback(async () => {
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '新对话' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const newConv: Conversation = {
+          id: json.data.id,
+          title: json.data.title,
+          lastMessage: '',
+          timestamp: new Date(),
+        };
+        setConversations((prev) => [newConv, ...prev]);
+        setActiveConvId(json.data.id);
+        setCurrentSessionId(json.data.id);
+        setMessages(initialMessages);
+      }
+    } catch (e) {
+      console.error('Failed to create session:', e);
+    }
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -632,6 +713,33 @@ export default function ChatPage() {
   const handleSend = async (text?: string) => {
     const messageText = text || input.trim();
     if (!messageText || isStreaming) return;
+
+    // 如果没有当前会话，先创建一个
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      try {
+        const res = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: messageText.slice(0, 30) }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          sessionId = json.data.id;
+          setCurrentSessionId(sessionId);
+          const newConv: Conversation = {
+            id: json.data.id,
+            title: json.data.title,
+            lastMessage: messageText,
+            timestamp: new Date(),
+          };
+          setConversations((prev) => [newConv, ...prev]);
+          setActiveConvId(sessionId);
+        }
+      } catch (e) {
+        console.error('Failed to create session:', e);
+      }
+    }
 
     idCounter.current += 1;
     const userMessage: Message = {
@@ -669,7 +777,7 @@ export default function ChatPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, sessionId }),
         signal: abortController.signal,
       });
 
@@ -792,11 +900,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleNewChat = () => {
-    setMessages(initialMessages);
-    setActiveConvId(null);
-  };
-
   return (
     <div className="flex h-full">
       {/* Conversation sidebar */}
@@ -822,7 +925,7 @@ export default function ChatPage() {
             {conversations.map((conv) => (
               <button
                 key={conv.id}
-                onClick={() => setActiveConvId(conv.id)}
+                onClick={() => handleSwitchSession(conv.id)}
                 className={cn(
                   'w-full rounded-lg px-3 py-2.5 text-left transition-colors',
                   activeConvId === conv.id
