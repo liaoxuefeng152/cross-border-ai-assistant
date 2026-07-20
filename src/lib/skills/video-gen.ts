@@ -36,7 +36,9 @@ export async function executeVideoGen(params: SkillExecuteParams): Promise<Skill
   const fullPrompt = `${prompt}, ${promptSuffix}`;
 
   try {
-    const config = new Config();
+    const config = new Config({
+      apiKey: process.env.COZE_LOOP_API_TOKEN || '',
+    });
     const client = new VideoGenerationClient(config, headers);
 
     const contentItems = [

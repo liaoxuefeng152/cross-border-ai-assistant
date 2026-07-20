@@ -40,7 +40,9 @@ export async function executeImageGen(params: SkillExecuteParams): Promise<Skill
   const fullPrompt = `${prompt}, ${scenePrompts[scene]}`;
 
   try {
-    const config = new Config();
+    const config = new Config({
+      apiKey: process.env.COZE_LOOP_API_TOKEN || '',
+    });
     const client = new ImageGenerationClient(config, headers);
 
     const response = await client.generate({
