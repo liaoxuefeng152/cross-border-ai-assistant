@@ -131,6 +131,21 @@ export default function VideoStudioPage() {
         };
         setGeneratedVideos((prev) => [newVideo, ...prev]);
         setPreviewVideo(data.data.videoUrl);
+
+        // Save to assets database
+        try {
+          await fetch('/api/assets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: data.data.prompt.slice(0, 100),
+              type: 'video',
+              url: data.data.videoUrl,
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to save video to assets:', e);
+        }
       } else {
         alert(data.error || '视频生成失败');
       }

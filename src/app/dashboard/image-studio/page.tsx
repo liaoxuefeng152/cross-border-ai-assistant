@@ -114,6 +114,25 @@ export default function ImageStudioPage() {
           createdAt: new Date(),
         }));
         setGeneratedImages((prev) => [...newImages, ...prev]);
+
+        // Save to assets database
+        try {
+          await Promise.all(
+            data.data.imageUrls.map((url: string) =>
+              fetch('/api/assets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: data.data.prompt.slice(0, 100),
+                  type: 'image',
+                  url,
+                }),
+              })
+            )
+          );
+        } catch (e) {
+          console.error('Failed to save images to assets:', e);
+        }
       } else {
         alert(data.error || '图片生成失败');
       }
