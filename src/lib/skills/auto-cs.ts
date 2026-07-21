@@ -1,27 +1,28 @@
+/**
+ * 自动客服技能（RAG 增强版）
+ * 基于知识库检索 + LLM 生成回复
+ */
+
+import { searchKnowledge } from '@/lib/agent/knowledge';
+import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import type { SkillExecuteParams, SkillResult } from './types';
 
-// 消息分类
-type MessageCategory = 'shipping' | 'return' | 'product' | 'complaint' | 'other';
-
-interface CustomerMessage {
-  id: string;
+interface Message {
+  role: 'system' | 'user' | 'assistant';
   content: string;
-  category: MessageCategory;
-  language: string;
-  sentiment: 'positive' | 'neutral' | 'negative';
-  needsReview: boolean;
 }
 
-interface AutoCSResult {
-  messages: Array<{
+export interface AutoCSResult {
+  messages: {
     id: string;
     original: string;
-    category: MessageCategory;
+    category: string;
     language: string;
-    sentiment: 'positive' | 'neutral' | 'negative';
+    sentiment: string;
     needsReview: boolean;
     reply: string;
-  }>;
+    knowledgeUsed: string[]; // 引用的知识条目
+  }[];
   summary: {
     total: number;
     shipping: number;
@@ -33,146 +34,129 @@ interface AutoCSResult {
   };
 }
 
-const CATEGORY_LABELS: Record<MessageCategory, string> = {
-  shipping: '物流查询',
-  return: '退换货',
-  product: '产品咨询',
-  complaint: '投诉/差评',
-  other: '其他',
-};
+// 分类提示词
+const CATEGORY_PROMPT = `请分析以下买家消息，返回 JSON 格式：
+{
+  "category": "shipping|return|product|complaint|other",
+  "sentiment": "positive|neutral|negative",
+  "language": "en|zh|ja|de|fr|es|it"
+}
 
-const CATEGORY_ICONS: Record<MessageCategory, string> = {
-  shipping: '🚚',
-  return: '🔄',
-  product: '💬',
-  complaint: '🔴',
-  other: '⚪',
-};
+分类规则：
+- shipping: 物流、配送、跟踪、收货相关
+- return: 退货、退款、换货相关
+- product: 产品咨询、尺寸、颜色、功能相关
+- complaint: 投诉、差评、质量问题相关
+- other: 其他
 
-const REPLY_TEMPLATES: Record<MessageCategory, string> = {
-  shipping: `Dear Customer,
+情感规则：
+- positive: 满意、感谢、好评
+- neutral: 中性询问
+- negative: 愤怒、失望、抱怨
 
-Thank you for reaching out. I sincerely apologize for any inconvenience.
+语言规则：根据消息内容判断语言`;
 
-I've checked your order and it is currently being processed. The estimated delivery date is within the next few business days. You will receive a tracking notification as soon as your package ships.
+// 生成回复的 prompt
+function buildReplyPrompt(
+  originalMessage: string,
+  category: string,
+  sentiment: string,
+  language: string,
+  knowledgeContext: string
+): Message[] {
+  const languageNames: Record<string, string> = {
+    en: 'English',
+    zh: 'Chinese',
+    ja: 'Japanese',
+    de: 'German',
+    fr: 'French',
+    es: 'Spanish',
+    it: 'Italian',
+  };
 
-If you have any further questions or concerns, please don't hesitate to contact us. We're here to help!
+  const toneInstruction =
+    sentiment === 'negative'
+      ? 'The customer is upset. Be empathetic, apologize sincerely, and offer concrete solutions.'
+      : sentiment === 'positive'
+        ? 'The customer is happy. Be warm and appreciative.'
+        : 'Be professional and helpful.';
 
-Best regards,
-Customer Service Team`,
+  return [
+    {
+      role: 'system',
+      content: `You are a professional cross-border e-commerce customer service representative.
 
-  return: `Dear Customer,
+${knowledgeContext ? `## Knowledge Base Reference\n${knowledgeContext}\n` : ''}
 
-Thank you for contacting us. I'm sorry to hear that you'd like to return your item.
+## Guidelines
+- Language: Reply in ${languageNames[language] || 'English'}
+- Tone: ${toneInstruction}
+- Style: Professional, concise, friendly
+- Format: Use proper email format with greeting and closing
+- If you don't know the answer, say so honestly and suggest contacting human support
+- Do not make up product details or policies not in the knowledge base`,
+    },
+    {
+      role: 'user',
+      content: `Buyer message (category: ${category}, sentiment: ${sentiment}):
 
-We offer a hassle-free return process. Here's what you need to do:
-1. Go to Your Orders on Amazon
-2. Select the item you'd like to return
-3. Choose your return reason and follow the instructions
+${originalMessage}
 
-Once we receive the returned item, we'll process your refund within 3-5 business days.
+Please write a professional reply.`,
+    },
+  ];
+}
 
-If you need any assistance with the return process, please let us know. We're happy to help!
-
-Best regards,
-Customer Service Team`,
-
-  product: `Dear Customer,
-
-Thank you for your interest in our product!
-
-I'd be happy to help answer your questions. [AI will fill in specific product details based on the question.]
-
-If you have any other questions or need further information, please feel free to ask. We're here to help you make the best decision!
-
-Best regards,
-Customer Service Team`,
-
-  complaint: `Dear Customer,
-
-I sincerely apologize for the negative experience you've had. Your satisfaction is extremely important to us, and I take your feedback very seriously.
-
-I would like to make this right for you. Could you please share more details about the issue so I can find the best solution? We can offer:
-- A full refund
-- A free replacement
-- A partial refund if you'd like to keep the item
-
-Please let me know which option works best for you, and I'll take care of it immediately.
-
-Again, I'm truly sorry for the inconvenience. We're committed to making this right.
-
-Best regards,
-Customer Service Team`,
-
-  other: `Dear Customer,
-
-Thank you for contacting us!
-
-I'd be happy to assist you with your inquiry. [AI will provide a specific response based on the message content.]
-
-If you need any further assistance, please don't hesitate to reach out. We're always here to help!
-
-Best regards,
-Customer Service Team`,
-};
-
-// 检测语言
+// 检测语言（备用方案）
 function detectLanguage(text: string): string {
-  const lower = text.toLowerCase();
   if (/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) return 'ja';
   if (/[\u4e00-\u9fa5]/.test(text)) return 'zh';
-  if (/\b(hallo|danke|bitte|ihnen)\b/.test(lower)) return 'de';
-  if (/\b(bonjour|merci|vous|cordialement)\b/.test(lower)) return 'fr';
-  if (/\b(hola|gracias|usted|saludos)\b/.test(lower)) return 'es';
-  if (/\b(ciao|grazie|cordiali\s+saluti)\b/.test(lower)) return 'it';
+  if (/\b(hallo|danke|bitte|ihnen)\b/.test(text.toLowerCase())) return 'de';
+  if (/\b(bonjour|merci|vous|cordialement)\b/.test(text.toLowerCase())) return 'fr';
+  if (/\b(hola|gracias|usted|saludos)\b/.test(text.toLowerCase())) return 'es';
+  if (/\b(ciao|grazie|cordiali\s+saluti)\b/.test(text.toLowerCase())) return 'it';
   return 'en';
 }
 
-// 检测情感
-function detectSentiment(text: string): 'positive' | 'neutral' | 'negative' {
+// 分类消息（备用方案）
+function categorizeMessage(text: string): string {
+  const lower = text.toLowerCase();
+  if (/\b(ship|track|deliver|arrived|when.*receive|where.*my|package|tracking)\b/.test(lower)) return 'shipping';
+  if (/\b(return|refund|exchange|money back|send back)\b/.test(lower)) return 'return';
+  if (/\b(angry|terrible|awful|worst|hate|disappointed|broken|defective|scam|complaint|review|star)\b/.test(lower)) return 'complaint';
+  if (/\b(size|color|weight|material|compatible|how.*use|specification|feature)\b/.test(lower)) return 'product';
+  return 'other';
+}
+
+// 检测情感（备用方案）
+function detectSentiment(text: string): string {
   const lower = text.toLowerCase();
   const negativeWords = ['angry', 'terrible', 'awful', 'worst', 'hate', 'disappointed', 'broken', 'defective', 'scam', 'fraud', 'refund', 'complaint', 'unacceptable', 'horrible'];
   const positiveWords = ['great', 'excellent', 'love', 'amazing', 'perfect', 'wonderful', 'thank', 'appreciate', 'good'];
 
-  const negCount = negativeWords.filter(w => lower.includes(w)).length;
-  const posCount = positiveWords.filter(w => lower.includes(w)).length;
+  const negCount = negativeWords.filter((w) => lower.includes(w)).length;
+  const posCount = positiveWords.filter((w) => lower.includes(w)).length;
 
   if (negCount > posCount) return 'negative';
   if (posCount > negCount) return 'positive';
   return 'neutral';
 }
 
-// 分类消息
-function categorizeMessage(text: string): MessageCategory {
-  const lower = text.toLowerCase();
-
-  if (/\b(ship|track|deliver|arrived|when.*receive|where.*my|package|tracking)\b/.test(lower)) return 'shipping';
-  if (/\b(return|refund|exchange|money back|send back)\b/.test(lower)) return 'return';
-  if (/\b(angry|terrible|awful|worst|hate|disappointed|broken|defective|scam|complaint|review|star)\b/.test(lower)) return 'complaint';
-  if (/\b(size|color|weight|material|compatible|how.*use|specification|feature)\b/.test(lower)) return 'product';
-
-  return 'other';
-}
-
 // 解析批量消息
 function parseMessages(rawText: string): string[] {
-  // 尝试按常见分隔符分割
   const separators = ['---', '===', 'Message:', 'Buyer:', '买家:', '顾客:'];
   let messages: string[] = [];
 
-  // 先尝试按分隔符分割
   for (const sep of separators) {
     if (rawText.includes(sep)) {
-      messages = rawText.split(sep).map(m => m.trim()).filter(m => m.length > 10);
+      messages = rawText.split(sep).map((m) => m.trim()).filter((m) => m.length > 10);
       if (messages.length > 1) return messages;
     }
   }
 
-  // 尝试按空行分割
-  const blocks = rawText.split(/\n\s*\n/).map(m => m.trim()).filter(m => m.length > 10);
+  const blocks = rawText.split(/\n\s*\n/).map((m) => m.trim()).filter((m) => m.length > 10);
   if (blocks.length > 1) return blocks;
 
-  // 单条消息
   return [rawText];
 }
 
@@ -193,30 +177,67 @@ export async function executeAutoCS(params: SkillExecuteParams): Promise<SkillRe
     needsReview: 0,
   };
 
+  // 初始化 LLM 客户端
+  const config = new Config();
+  const headers = HeaderUtils.extractForwardHeaders(params.headers || {});
+  const llm = new LLMClient(config, headers);
+
   for (let i = 0; i < messages.length; i++) {
     const content = messages[i];
-    const category = categorizeMessage(content);
-    const language = detectLanguage(content);
-    const sentiment = detectSentiment(content);
+
+    // 1. 使用 LLM 分类（带降级）
+    let category = 'other';
+    let sentiment = 'neutral';
+    let language = 'en';
+
+    try {
+      const classifyMessages: Message[] = [
+        { role: 'system', content: CATEGORY_PROMPT },
+        { role: 'user', content },
+      ];
+
+      const classifyResponse = await llm.invoke(classifyMessages, {
+        model: 'doubao-seed-2-0-lite-260215',
+        temperature: 0.3,
+      });
+      const jsonMatch = classifyResponse.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        category = parsed.category || categorizeMessage(content);
+        sentiment = parsed.sentiment || detectSentiment(content);
+        language = parsed.language || detectLanguage(content);
+      }
+    } catch (error) {
+      // 降级到规则匹配
+      category = categorizeMessage(content);
+      sentiment = detectSentiment(content);
+      language = detectLanguage(content);
+      console.warn('[AutoCS] LLM classification failed, using rule-based fallback');
+    }
+
+    // 2. RAG 知识检索
+    const knowledgeItems = await searchKnowledge(content, { limit: 3 });
+    const knowledgeContext = knowledgeItems.length > 0
+      ? knowledgeItems
+          .map((item, idx) => `[${idx + 1}] ${item.title}\n${item.content}`)
+          .join('\n\n')
+      : '';
+
+    // 3. LLM 生成回复
+    let reply = '';
+    try {
+      const replyMessages = buildReplyPrompt(content, category, sentiment, language, knowledgeContext);
+      const replyResponse = await llm.invoke(replyMessages, {
+        model: 'doubao-seed-2-0-lite-260215',
+        temperature: 0.7,
+      });
+      reply = replyResponse.content;
+    } catch (error) {
+      reply = `Dear Customer,\n\nThank you for contacting us. We have received your message and will respond shortly.\n\nBest regards,\nCustomer Service Team`;
+      console.error('[AutoCS] LLM reply generation failed:', error);
+    }
+
     const needsReview = category === 'complaint' || sentiment === 'negative';
-
-    // 生成回复
-    let reply = REPLY_TEMPLATES[category];
-
-    // 如果是产品咨询，尝试从消息中提取具体问题
-    if (category === 'product') {
-      reply = reply.replace(
-        '[AI will fill in specific product details based on the question.]',
-        `Regarding your question about "${content.substring(0, 80)}${content.length > 80 ? '...' : ''}", I'd be happy to provide more details. Please feel free to ask any specific questions about the product.`
-      );
-    }
-
-    if (category === 'other') {
-      reply = reply.replace(
-        '[AI will provide a specific response based on the message content.]',
-        `Based on your message, I understand you're asking about: "${content.substring(0, 80)}${content.length > 80 ? '...' : ''}". Let me address this for you.`
-      );
-    }
 
     results.push({
       id: `msg-${i + 1}`,
@@ -226,9 +247,10 @@ export async function executeAutoCS(params: SkillExecuteParams): Promise<SkillRe
       sentiment,
       needsReview,
       reply,
+      knowledgeUsed: knowledgeItems.map((item) => item.title),
     });
 
-    summary[category]++;
+    summary[category as keyof typeof summary]++;
     if (needsReview) summary.needsReview++;
   }
 
