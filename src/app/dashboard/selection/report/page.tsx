@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -230,6 +230,14 @@ function generateReportFromProduct(product: ProductData): ReportData {
 }
 
 export default function SelectionReportPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">加载中...</div>}>
+      <SelectionReportContent />
+    </Suspense>
+  );
+}
+
+function SelectionReportContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [report, setReport] = useState<ReportData | null>(null);

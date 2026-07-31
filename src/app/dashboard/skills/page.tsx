@@ -22,6 +22,7 @@ import {
   Zap,
   Star,
   ArrowRight,
+  Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -116,6 +117,18 @@ const builtInSkills: Skill[] = [
     isBuiltIn: true,
     usageCount: 0,
     triggerHint: '对话中说"帮我回复买家消息"或粘贴买家消息',
+  },
+  {
+    id: 'browser-automation',
+    name: '浏览器自动化',
+    description: '代操作浏览器：自动登录电商平台后台、爬取数据、发布商品、回复消息',
+    icon: Monitor,
+    category: 'operation',
+    installed: true,
+    enabled: true,
+    isBuiltIn: true,
+    usageCount: 0,
+    triggerHint: '对话中说"帮我登录 Amazon 后台"或"自动上架商品"',
   },
   {
     id: 'data-insight',

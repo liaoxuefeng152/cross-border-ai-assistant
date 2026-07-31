@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Link2,
@@ -98,6 +98,14 @@ const targetPlatforms = [
 ];
 
 export default function ListingPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">加载中...</div>}>
+      <ListingPageContent />
+    </Suspense>
+  );
+}
+
+function ListingPageContent() {
   const searchParams = useSearchParams();
   const [links, setLinks] = useState('');
   const [items, setItems] = useState<ListingItem[]>(mockItems);

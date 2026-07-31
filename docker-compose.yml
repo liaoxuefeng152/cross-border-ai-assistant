@@ -1,0 +1,80 @@
+# ============================================================
+# 龙掌柜 AI 助手 - Docker Compose
+# 一键启动：App + Supabase (PostgreSQL + Auth + Storage)
+# ============================================================
+
+services:
+  # ---- PostgreSQL（Supabase 依赖） ----
+  db:
+    image: postgres:15
+    container_name: lzg-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lzg123456}
+      POSTGRES_DB: lzg_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # 初始化脚本
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lzg-network
+
+  # ---- Supabase Studio（管理面板，可选） ----
+  studio:
+    image: supabase/studio:2026.03.22
+    container_name: lzg-studio
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      SUPABASE_URL: http://api:8000
+      STUDIO_PG_META_URL: http://meta:8080
+    networks:
+      - lzg-network
+    profiles:
+      - full
+
+  # ---- 龙掌柜 AI 助手 ----
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lzg-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # 必须配置
+      COZE_SUPABASE_URL: ${COZE_SUPABASE_URL:-http://host.docker.internal:54321}
+      COZE_SUPABASE_ANON_KEY: ${COZE_SUPABASE_ANON_KEY}
+      COZE_SUPABASE_SERVICE_ROLE_KEY: ${COZE_SUPABASE_SERVICE_ROLE_KEY}
+      # 可选
+      BROWSER_HEADFUL: ${BROWSER_HEADFUL:-false}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+    volumes:
+      # 持久化 Playwright 浏览器缓存
+      - playwright_cache:/home/appuser/.cache/ms-playwright
+    networks:
+      - lzg-network
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  db_data:
+    driver: local
+  playwright_cache:
+    driver: local
+
+networks:
+  lzg-network:
+    driver: bridge

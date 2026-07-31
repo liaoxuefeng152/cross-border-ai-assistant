@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import {
   Send,
   Paperclip,
@@ -27,12 +28,15 @@ import {
   Headphones,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { QuestionnaireForm } from '@/components/questionnaire-form';
+import { ModelSelector } from '@/components/chat/model-selector';
+import { initModels, resolveModel } from '@/lib/models';
 
 // ---- Types ----
 interface SkillData {
@@ -42,6 +46,23 @@ interface SkillData {
   summary: string;
 }
 
+interface ToolCallInfo {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+  status: 'running' | 'success' | 'error';
+  output?: string;
+  data?: unknown;
+}
+
+interface Attachment {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  size?: number;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -49,6 +70,8 @@ interface Message {
   timestamp: Date;
   skill?: SkillData;
   skillRunning?: boolean;
+  toolCalls?: ToolCallInfo[];
+  attachments?: Attachment[];
 }
 
 interface Conversation {
@@ -578,6 +601,78 @@ function SkillRunningCard({ type, label }: { type: string; label: string }) {
   );
 }
 
+// 工具名中文映射
+const TOOL_NAME_MAP: Record<string, string> = {
+  image_gen: 'AI 作图',
+  video_gen: 'AI 视频',
+  product_selection: '智能选品',
+  listing_optimize: 'Listing 优化',
+  ad_optimize: '广告优化',
+  auto_cs: '自动客服',
+  browser_automation: '浏览器自动化',
+  code_execute: '代码执行',
+  file_read: '读取文件',
+  file_write: '写入文件',
+  file_list: '列出文件',
+  product_search: '商品搜索',
+  package_install: '安装依赖',
+};
+
+function ToolCallCard({ tc }: { tc: ToolCallInfo }) {
+  const [expanded, setExpanded] = useState(false);
+  const label = TOOL_NAME_MAP[tc.name] || tc.name;
+
+  if (tc.status === 'running') {
+    return (
+      <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/50 p-2">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+          <span className="text-xs font-medium text-blue-700">{label}</span>
+          <span className="text-[10px] text-blue-400">执行中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (tc.status === 'error') {
+    return (
+      <div className="mt-2 rounded-lg border border-red-200 bg-red-50/50 p-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs">❌</span>
+          <span className="text-xs font-medium text-red-700">{label}</span>
+        </div>
+        <p className="mt-1 text-[10px] text-red-500">{tc.output}</p>
+      </div>
+    );
+  }
+
+  // success
+  return (
+    <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        <span className="text-xs">✅</span>
+        <span className="text-xs font-medium text-emerald-700">{label}</span>
+        <span className="text-[10px] text-emerald-500">
+          {(tc.output || '').length > 60
+            ? (tc.output || '').slice(0, 60) + '...'
+            : tc.output}
+        </span>
+        {tc.output && tc.output.length > 0 && (
+          expanded ? <ChevronUp className="ml-auto h-3 w-3 text-emerald-400" /> : <ChevronDown className="ml-auto h-3 w-3 text-emerald-400" />
+        )}
+      </button>
+      {expanded && tc.output && (
+        <pre className="mt-2 max-h-40 overflow-auto rounded bg-white p-2 text-[10px] text-slate-600">
+          {tc.output}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function SkillResultRenderer({ skill }: { skill: SkillData }) {
   if (skill.status === 'running' || !skill.data) {
     return <SkillRunningCard type={skill.type} label={skill.summary || '技能执行中'} />;
@@ -630,16 +725,34 @@ export default function ChatPage() {
     }>;
   } | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'auto';
+    return localStorage.getItem('lzg-selected-model') || 'auto';
+  });
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+
+  // 初始化：从管理端拉取模型列表
+  useEffect(() => {
+    initModels().then(() => {
+      console.log('[Models] 模型列表已加载');
+    });
+  }, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const idCounter = useRef(0);
+
+  // 保存模型选择
+  useEffect(() => {
+    localStorage.setItem('lzg-selected-model', selectedModel);
+  }, [selectedModel]);
 
   // 加载会话列表
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const res = await fetch('/api/sessions');
+        const res = await fetch('/api/chat/sessions');
         const json = await res.json();
         if (json.success) {
           const convs: Conversation[] = json.data.map((s: { id: string; title: string; updated_at: string }) => ({
@@ -660,7 +773,7 @@ export default function ChatPage() {
   // 加载会话消息
   const loadSessionMessages = useCallback(async (sessionId: string) => {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/messages`);
+      const res = await fetch(`/api/chat/sessions/${sessionId}/messages`);
       const json = await res.json();
       if (json.success) {
         const loadedMessages: Message[] = json.data.map((m: { id: string; role: string; content: string; created_at: string; skill_type: string; skill_result: string }) => ({
@@ -692,7 +805,7 @@ export default function ChatPage() {
   // 创建新会话
   const handleNewChat = useCallback(async () => {
     try {
-      const res = await fetch('/api/sessions', {
+      const res = await fetch('/api/chat/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '新任务' }),
@@ -709,9 +822,12 @@ export default function ChatPage() {
         setActiveConvId(json.data.id);
         setCurrentSessionId(json.data.id);
         setMessages(initialMessages);
+      } else {
+        toast.error(json.error || '创建任务失败，请稍后重试');
       }
     } catch (e) {
       console.error('Failed to create session:', e);
+      toast.error('网络错误，创建任务失败');
     }
   }, []);
 
@@ -720,7 +836,7 @@ export default function ChatPage() {
     if (!confirm('确定要清空所有任务记录吗？此操作不可恢复。')) return;
 
     try {
-      const res = await fetch('/api/sessions/clear', {
+      const res = await fetch('/api/chat/sessions/clear', {
         method: 'POST',
       });
       const json = await res.json();
@@ -743,15 +859,58 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // 选择附件并上传到素材库
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    for (const file of Array.from(files)) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', file.type.startsWith('image/') ? 'image' : 'file');
+
+      try {
+        const res = await fetch('/api/assets', { method: 'POST', body: formData });
+        const json = await res.json();
+        if (json.success) {
+          setPendingAttachments((prev) => [
+            ...prev,
+            {
+              id: json.data.id,
+              name: json.data.name,
+              type: json.data.type,
+              url: json.data.url,
+              size: json.data.size,
+            },
+          ]);
+        } else {
+          toast.error(json.error || `上传失败: ${file.name}`);
+        }
+      } catch (e) {
+        console.error('Failed to upload file:', e);
+        toast.error(`上传失败: ${file.name}`);
+      }
+    }
+
+    // 清空 input，允许重复选择同一文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const removePendingAttachment = useCallback((id: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   const handleSend = async (text?: string) => {
     const messageText = text || input.trim();
-    if (!messageText || isStreaming) return;
+    if ((!messageText && pendingAttachments.length === 0) || isStreaming) return;
 
     // 如果没有当前会话，先创建一个
     let sessionId = currentSessionId;
     if (!sessionId) {
       try {
-        const res = await fetch('/api/sessions', {
+        const res = await fetch('/api/chat/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: messageText.slice(0, 30) }),
@@ -777,7 +936,7 @@ export default function ChatPage() {
       const currentConv = conversations.find((c) => c.id === sessionId);
       if (currentConv && currentConv.title === '新任务') {
         try {
-          await fetch(`/api/sessions/${sessionId}`, {
+          await fetch(`/api/chat/sessions/${sessionId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title: messageText.slice(0, 30) }),
@@ -799,10 +958,12 @@ export default function ChatPage() {
       role: 'user',
       content: messageText,
       timestamp: new Date(),
+      attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setPendingAttachments([]);
     setIsStreaming(true);
 
     // Create assistant message placeholder
@@ -819,17 +980,22 @@ export default function ChatPage() {
     // Build messages array for API
     const apiMessages = [...messages, userMessage]
       .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        attachments: m.attachments,
+      }));
 
     // Start streaming
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     try {
+      const resolvedModel = resolveModel(input, selectedModel);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: apiMessages, sessionId }),
+        body: JSON.stringify({ messages: apiMessages, sessionId, model: resolvedModel }),
         signal: abortController.signal,
       });
 
@@ -858,7 +1024,8 @@ export default function ChatPage() {
               const parsed = JSON.parse(data) as Record<string, unknown>;
 
               if (parsed.type === 'error') {
-                accumulated += `\n\n[错误: ${parsed.error as string}]`;
+                const errMsg = (parsed.message as string) || (parsed.error as string) || '未知错误';
+                accumulated += `\n\n[错误: ${errMsg}]`;
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMsgId ? { ...m, content: accumulated } : m
@@ -896,6 +1063,68 @@ export default function ChatPage() {
                             data: parsed.data as Record<string, unknown> | null,
                             summary: parsed.summary as string,
                           },
+                        }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'thinking') {
+                // Agent 思考中
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId && !accumulated
+                      ? { ...m, content: '🤔 ' + (parsed.content as string) }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'tool-call-start') {
+                // 工具调用开始 → 添加到 toolCalls 列表
+                const tc: ToolCallInfo = {
+                  id: parsed.toolId as string,
+                  name: parsed.toolName as string,
+                  args: parsed.args as Record<string, unknown>,
+                  status: 'running',
+                };
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          toolCalls: [
+                            ...(m.toolCalls || []).filter((t) => t.id !== tc.id),
+                            tc,
+                          ],
+                        }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'tool-call-result') {
+                // 工具调用结果
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          toolCalls: (m.toolCalls || []).map((t) =>
+                            t.id === (parsed.toolId as string)
+                              ? { ...t, status: 'success', output: parsed.output as string, data: parsed.data }
+                              : t
+                          ),
+                        }
+                      : m
+                  )
+                );
+              } else if (parsed.type === 'tool-call-error') {
+                // 工具调用错误
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMsgId
+                      ? {
+                          ...m,
+                          toolCalls: (m.toolCalls || []).map((t) =>
+                            t.id === (parsed.toolId as string)
+                              ? { ...t, status: 'error', output: parsed.error as string }
+                              : t
+                          ),
                         }
                       : m
                   )
@@ -1072,9 +1301,9 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-[calc(100dvh-4rem)]">
       {/* Conversation sidebar */}
-      <div className="hidden w-64 flex-col border-r bg-white lg:flex">
+      <div className="hidden h-full w-64 flex-col border-r bg-white lg:flex">
         <div className="p-3">
           <Button
             variant="outline"
@@ -1131,7 +1360,7 @@ export default function ChatPage() {
       </div>
 
       {/* Main chat area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-hidden">
         {/* Chat header */}
         <div className="flex items-center justify-between border-b bg-white px-6 py-3">
           <div className="flex items-center gap-3">
@@ -1157,7 +1386,7 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="mx-auto max-w-3xl px-4 py-6">
             <div className="space-y-6">
               {messages.map((msg) => (
@@ -1190,6 +1419,38 @@ export default function ChatPage() {
                         : 'rounded-tr-sm bg-emerald-600 text-white'
                     )}
                   >
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        {msg.attachments.map((att) =>
+                          att.type === 'image' ? (
+                            <a
+                              key={att.id}
+                              href={att.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block overflow-hidden rounded-lg"
+                            >
+                              <img
+                                src={att.url}
+                                alt={att.name}
+                                className="h-20 w-20 object-cover hover:opacity-90"
+                              />
+                            </a>
+                          ) : (
+                            <a
+                              key={att.id}
+                              href={att.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1.5 rounded-md bg-white/20 px-2 py-1 text-xs hover:bg-white/30"
+                            >
+                              <FileText className="h-3 w-3" />
+                              <span className="max-w-[120px] truncate">{att.name}</span>
+                            </a>
+                          )
+                        )}
+                      </div>
+                    )}
                     <div className="whitespace-pre-wrap">
                       {msg.content || msg.skill?.status === 'running' ? (
                         msg.content || ''
@@ -1209,6 +1470,15 @@ export default function ChatPage() {
                       <SkillResultRenderer skill={msg.skill} />
                     )}
 
+                    {/* Render tool call cards */}
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {msg.toolCalls.map((tc) => (
+                          <ToolCallCard key={tc.id} tc={tc} />
+                        ))}
+                      </div>
+                    )}
+
                     <div
                       className={cn(
                         'mt-2 text-[10px]',
@@ -1216,6 +1486,7 @@ export default function ChatPage() {
                           ? 'text-muted-foreground'
                           : 'text-emerald-200'
                       )}
+                      suppressHydrationWarning
                     >
                       {msg.timestamp.toLocaleTimeString('zh-CN', {
                         hour: '2-digit',
@@ -1297,47 +1568,86 @@ export default function ChatPage() {
         {/* Input area */}
         <div className="border-t bg-white px-4 py-4">
           <div className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-3 rounded-xl border bg-white p-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 text-muted-foreground"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="输入需求，如：帮我生成一张商品图 / 推荐几个热卖产品 / 优化 Listing..."
-                className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                rows={1}
-                disabled={isStreaming}
-              />
-              {isStreaming ? (
-                <Button
-                  size="icon"
-                  className="h-8 w-8 shrink-0 bg-red-500 text-white hover:bg-red-600"
-                  onClick={handleStop}
-                >
-                  <StopCircle className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  size="icon"
-                  className="h-8 w-8 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={!input.trim()}
-                  onClick={() => handleSend()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+            <div className="rounded-xl border bg-white p-3 shadow-sm focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-100">
+              {pendingAttachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pendingAttachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-1.5 rounded-md bg-accent px-2 py-1 text-xs"
+                    >
+                      {att.type === 'image' ? (
+                        <ImageIcon className="h-3 w-3 text-emerald-600" />
+                      ) : (
+                        <FileText className="h-3 w-3 text-blue-600" />
+                      )}
+                      <span className="max-w-[120px] truncate">{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePendingAttachment(att.id)}
+                        className="ml-1 rounded-full p-0.5 hover:bg-muted"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
+              <div className="flex items-end gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.csv,.xlsx,.xls,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isStreaming}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="输入需求，如：帮我生成一张商品图 / 推荐几个热卖产品 / 优化 Listing..."
+                  className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  rows={1}
+                  disabled={isStreaming}
+                />
+                {isStreaming ? (
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 shrink-0 bg-red-500 text-white hover:bg-red-600"
+                    onClick={handleStop}
+                  >
+                    <StopCircle className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                    disabled={!input.trim() && pendingAttachments.length === 0}
+                    onClick={() => handleSend()}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">
-              <Sparkles className="mr-1 inline h-3 w-3" />
-              AI 会自动识别并调用对应技能（作图/视频/选品/Listing）
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <ModelSelector value={selectedModel} onChange={setSelectedModel} />
+              <p className="text-center text-[10px] text-muted-foreground">
+                <Sparkles className="mr-1 inline h-3 w-3" />
+                AI 会自动识别并调用对应技能（作图/视频/选品/Listing）
+              </p>
+            </div>
           </div>
         </div>
       </div>
